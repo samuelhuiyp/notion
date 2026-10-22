@@ -1,0 +1,24 @@
+# -----------------------------------------------------------------------------
+# csi-driver-nfs (upstream kubernetes-csi) — Helm values
+#   helm repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+#   helm upgrade --install csi-driver-nfs csi-driver-nfs/csi-driver-nfs \
+#     -n kube-system --version <pin, e.g. 4.x> -f 02-storage-drivers/nfs-csi/helm-values.yaml
+# Docs: https://github.com/kubernetes-csi/csi-driver-nfs
+#
+# Intended use: Kasten FileStore target, shared ISO/export areas, filesystem PVCs.
+# NFS CSI cannot provide volumeMode: Block. Check your Harvester release's
+# third-party storage docs before using it for VM disks (filesystem-mode VM
+# volumes are only supported on newer releases).
+# -----------------------------------------------------------------------------
+kubeletDir: /var/lib/kubelet
+controller:
+  replicas: 2
+  runOnControlPlane: false
+  tolerations: []
+node:
+  maxUnavailable: 1
+externalSnapshotter:
+  enabled: false          # Harvester already runs snapshot-controller + CRDs
+feature:
+  enableFSGroupPolicy: true
+  enableInlineVolume: false

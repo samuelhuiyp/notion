@@ -1,0 +1,11 @@
+# -----------------------------------------------------------------------------
+# Tells Harvester which VolumeSnapshotClass to use per CSI driver, so the native
+# VM snapshot/backup features work on third-party storage too.
+# Keep the Longhorn entry exactly as the Harvester default.
+# Docs: https://docs.harvesterhci.io/latest/advanced/settings#csi-driver-config
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: csi-driver-config
+value: '{"driver.longhorn.io":{"volumeSnapshotClassName":"longhorn-snapshot","backupVolumeSnapshotClassName":"longhorn"},"csi.trident.netapp.io":{"volumeSnapshotClassName":"trident-snapclass","backupVolumeSnapshotClassName":"trident-snapclass"},"pxd.portworx.com":{"volumeSnapshotClassName":"px-csi-snapclass","backupVolumeSnapshotClassName":"px-csi-snapclass"}}'

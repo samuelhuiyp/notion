@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------------------
+# KSM (Kernel Samepage Merging) — dedupes identical memory pages across VMs.
+# Enabled only on WORKER nodes (hv04/hv05) that host general-purpose VMs:
+# it costs CPU and has a theoretical side-channel risk between tenants,
+# so it stays off on management nodes and anywhere multi-tenant/security-sensitive.
+# Ksmtuned objects are cluster-scoped and named after the node.
+# Docs: https://docs.harvesterhci.io/latest/host/#ksmtuned-mode
+# -----------------------------------------------------------------------------
+apiVersion: node.harvesterhci.io/v1beta1
+kind: Ksmtuned
+metadata:
+  name: hv04
+spec:
+  run: run
+  mode: standard
+  thresCoef: 20                   # start merging when free memory < 20%
+  mergeAcrossNodes: 1
+  ksmtunedParameters:
+    boost: 0
+    decay: 0
+    maxPages: 100
+    minPages: 100
+    sleepMsec: 20
+---
+apiVersion: node.harvesterhci.io/v1beta1
+kind: Ksmtuned
+metadata:
+  name: hv05
+spec:
+  run: run
+  mode: standard
+  thresCoef: 20
+  mergeAcrossNodes: 1
+  ksmtunedParameters:
+    boost: 0
+    decay: 0
+    maxPages: 100
+    minPages: 100
+    sleepMsec: 20

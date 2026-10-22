@@ -1,0 +1,109 @@
+# -----------------------------------------------------------------------------
+# Tiered backup policies, selected by namespace (one namespace = one tier).
+#   gold   (vm-prod, vm-dmz) : hourly snapshots, daily export to S3, RPO 1h
+#   silver (rke2-guests)     : daily snapshot + export, RPO 24h
+#   bronze (vm-dev)          : daily export only to NFS, short retention
+# For application-consistent VM backups, install qemu-guest-agent in the guest
+# and annotate the VirtualMachine with k10.kasten.io/freezeVM: "true".
+# Docs: https://docs.kasten.io/latest/api/policies.html
+# -----------------------------------------------------------------------------
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: gold-vm-prod
+  namespace: kasten-io
+spec:
+  comment: "Tier gold - production VMs"
+  frequency: "@hourly"
+  subFrequency:
+    minutes: [15]                      # stagger away from :00
+  retention:
+    hourly: 24
+    daily: 7
+    weekly: 4
+    monthly: 12
+    yearly: 1
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values: [vm-prod, vm-dmz]
+  actions:
+    - action: backup
+    - action: export
+      exportParameters:
+        frequency: "@daily"
+        profile:
+          name: s3-immutable
+          namespace: kasten-io
+        exportData:
+          enabled: true
+      retention:
+        daily: 14
+        weekly: 8
+        monthly: 12
+        yearly: 3
+---
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: silver-rke2-guests
+  namespace: kasten-io
+spec:
+  comment: "Tier silver - guest cluster node VMs (workloads inside should have their own backup)"
+  frequency: "@daily"
+  subFrequency:
+    hours: [1]
+    minutes: [30]
+  retention:
+    daily: 7
+    weekly: 4
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values: [rke2-guests]
+  actions:
+    - action: backup
+    - action: export
+      exportParameters:
+        frequency: "@daily"
+        profile:
+          name: s3-immutable
+          namespace: kasten-io
+        exportData:
+          enabled: true
+      retention:
+        daily: 7
+        weekly: 4
+---
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Policy
+metadata:
+  name: bronze-vm-dev
+  namespace: kasten-io
+spec:
+  comment: "Tier bronze - dev/test VMs"
+  frequency: "@daily"
+  subFrequency:
+    hours: [3]
+    minutes: [0]
+  retention:
+    daily: 3
+  selector:
+    matchExpressions:
+      - key: k10.kasten.io/appNamespace
+        operator: In
+        values: [vm-dev]
+  actions:
+    - action: backup
+    - action: export
+      exportParameters:
+        frequency: "@daily"
+        profile:
+          name: nfs-local
+          namespace: kasten-io
+        exportData:
+          enabled: true
+      retention:
+        daily: 7

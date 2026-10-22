@@ -1,0 +1,42 @@
+# -----------------------------------------------------------------------------
+# NetApp (Trident) tiers — external storage
+#   netapp-san-performance : ontap-san / iSCSI, raw block, RWX -> live migration OK
+#   netapp-nas-capacity    : ontap-nas / NFS, filesystem only
+# "selector" matches the labels on the TridentBackendConfig (02-storage-drivers).
+# -----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: netapp-san-performance
+  annotations:
+    description: "External tier 1 - NetApp AFF iSCSI, array-side RAID/dedupe, RWX block"
+provisioner: csi.trident.netapp.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  backendType: ontap-san
+  selector: "tier=performance"
+  provisioningType: thin
+  snapshots: "true"
+  clones: "true"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: netapp-nas-capacity
+  annotations:
+    description: "External tier 2 - NetApp NFSv4.1, filesystem volumes"
+provisioner: csi.trident.netapp.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+mountOptions:
+  - nfsvers=4.1
+  - hard
+  - nconnect=8
+parameters:
+  backendType: ontap-nas
+  selector: "tier=capacity"
+  provisioningType: thin
+  snapshots: "true"

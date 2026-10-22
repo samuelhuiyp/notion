@@ -1,0 +1,30 @@
+# -----------------------------------------------------------------------------
+# NetApp ONTAP SAN (iSCSI) backend -> PERFORMANCE tier on external storage.
+# Block volumes, RWX-capable => supports Harvester live migration.
+# Docs: https://docs.netapp.com/us-en/trident/trident-use/ontap-san-examples.html
+# -----------------------------------------------------------------------------
+apiVersion: trident.netapp.io/v1
+kind: TridentBackendConfig
+metadata:
+  name: ontap-san-perf
+  namespace: trident
+spec:
+  version: 1
+  storageDriverName: ontap-san
+  backendName: ontap-san-perf
+  managementLIF: 10.10.10.200
+  svm: svm_harvester
+  sanType: iscsi
+  useCHAP: true
+  credentials:
+    name: backend-ontap-secret
+  limitVolumeSize: 8Ti
+  defaults:
+    spaceReserve: none           # thin
+    spaceAllocation: "true"      # SCSI UNMAP -> space reclaim from guests
+    snapshotPolicy: none         # snapshots driven by K8s/Kasten, not ONTAP schedules
+    snapshotReserve: "0"
+    encryption: "false"          # set "true" if NVE/NAE licensed
+  labels:
+    tier: performance
+    protocol: iscsi

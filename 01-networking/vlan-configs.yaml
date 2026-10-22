@@ -1,0 +1,39 @@
+# Uplinks per cluster network. One VlanConfig per (cluster network, node group).
+# All nodes are homogeneous, so nodeSelector is empty (= all nodes).
+# If later you add nodes with different NIC names, add a second VlanConfig
+# with a nodeSelector — one node may only belong to one VlanConfig per cluster network.
+apiVersion: network.harvesterhci.io/v1beta1
+kind: VlanConfig
+metadata:
+  name: vmnet-all-nodes
+spec:
+  clusterNetwork: vmnet
+  nodeSelector: {}
+  uplink:
+    nics:
+      - ens1f0          # port on NIC card 1
+      - ens2f0          # port on NIC card 2 -> survives a card failure
+    linkAttributes:
+      mtu: 9000         # bridge/bond at 9000 so VLAN 30 (migration) can use jumbo; VM NICs stay 1500
+      txQLen: -1
+    bondOptions:
+      mode: 802.3ad     # requires LACP/MLAG on the ToR pair
+      miimon: 100
+---
+apiVersion: network.harvesterhci.io/v1beta1
+kind: VlanConfig
+metadata:
+  name: storage-all-nodes
+spec:
+  clusterNetwork: storage
+  nodeSelector: {}
+  uplink:
+    nics:
+      - ens1f1
+      - ens3f0
+    linkAttributes:
+      mtu: 9000         # jumbo end-to-end: NIC, switch ports, switch VLAN 20
+      txQLen: -1
+    bondOptions:
+      mode: 802.3ad
+      miimon: 100

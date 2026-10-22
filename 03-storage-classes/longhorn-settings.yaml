@@ -1,0 +1,85 @@
+# -----------------------------------------------------------------------------
+# Longhorn global settings (Longhorn bundled with Harvester).
+# Harvester's managed chart owns some Longhorn settings and may revert manual
+# changes on upgrade — re-apply this file after every Harvester upgrade and
+# diff `kubectl -n longhorn-system get settings.longhorn.io` against it.
+# Value formats changed in newer Longhorn (some accept per-data-engine JSON);
+# check `kubectl -n longhorn-system get setting <name> -o yaml` first.
+# Docs: https://longhorn.io/docs/latest/references/settings/
+# -----------------------------------------------------------------------------
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: storage-over-provisioning-percentage
+  namespace: longhorn-system
+value: "200"                      # thin provisioning up to 2x physical (matches overcommit-config storage=200)
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: storage-minimal-available-percentage
+  namespace: longhorn-system
+value: "25"                       # stop scheduling replicas on a disk below 25% free
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: replica-soft-anti-affinity
+  namespace: longhorn-system
+value: "false"                    # never put two replicas of a volume on the same node
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: replica-zone-soft-anti-affinity
+  namespace: longhorn-system
+value: "true"                     # prefer spreading across racks (topology.kubernetes.io/zone) but allow if impossible
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: replica-auto-balance
+  namespace: longhorn-system
+value: "best-effort"
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: concurrent-replica-rebuild-per-node-limit
+  namespace: longhorn-system
+value: "3"                        # cap rebuild storms after a node returns (default 5)
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: replica-replenishment-wait-interval
+  namespace: longhorn-system
+value: "600"                      # wait 10 min for a rebooting node before rebuilding elsewhere
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: fast-replica-rebuild-enabled
+  namespace: longhorn-system
+value: "true"
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: snapshot-data-integrity
+  namespace: longhorn-system
+value: "fast-check"
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: snapshot-data-integrity-cronjob
+  namespace: longhorn-system
+value: "0 2 * * 6"                # Saturday 02:00 — outside business hours
+---
+apiVersion: longhorn.io/v1beta2
+kind: Setting
+metadata:
+  name: auto-cleanup-system-generated-snapshot
+  namespace: longhorn-system
+value: "true"

@@ -1,0 +1,63 @@
+# -----------------------------------------------------------------------------
+# Harvester install configuration — hv02 (join, role: management)
+# Used by the ISO (interactive "remote config URL") or PXE (harvester.install.config_url).
+# Schema: https://docs.harvesterhci.io/latest/install/harvester-configuration
+# Secrets: token/password are placeholders. Render them at install time from your
+# vault (e.g. envsubst < hv02-join.yaml) — never commit real values.
+# -----------------------------------------------------------------------------
+scheme_version: 1
+server_url: https://10.10.10.10:443      # cluster VIP
+token: "${HARVESTER_CLUSTER_TOKEN}"     # same token on every node
+
+os:
+  hostname: hv02
+  password: "${HARVESTER_OS_PASSWORD_HASH}"   # SHA-512 crypt hash, not plaintext
+  ssh_authorized_keys:
+    - "${OPS_SSH_PUBKEY}"
+  ntp_servers:
+    - ntp1.corp.example.com
+    - ntp2.corp.example.com
+  dns_nameservers:
+    - 10.10.10.53
+    - 10.10.10.54
+  modules:
+    - kvm
+    - vhost_net
+    - nvme
+  sysctls:
+    # Larger socket buffers / backlog for 25GbE links (live migration, Longhorn).
+    net.core.rmem_max: "134217728"
+    net.core.wmem_max: "134217728"
+    net.core.netdev_max_backlog: "250000"
+    net.ipv4.tcp_mtu_probing: "1"
+    vm.max_map_count: "262144"
+    fs.inotify.max_user_instances: "8192"
+    fs.inotify.max_user_watches: "1048576"
+  labels:
+    topology.kubernetes.io/region: dc1
+    topology.kubernetes.io/zone: rack-b
+
+install:
+  mode: join
+  role: management
+  # Use stable /dev/disk/by-id paths — /dev/nvmeXn1 / /dev/sdX enumeration can change between boots.
+  device: /dev/disk/by-id/REPLACE-boot-raid1          # OS disk (BOSS/RAID1 M.2)
+  data_disk: /dev/disk/by-id/REPLACE-nvme0            # separate data disk = best practice
+  persistent_partition_size: 150Gi
+  wipe_all_disks: false                               # explicit: only device + data_disk are touched
+  skipchecks: false                                   # keep hardware pre-checks on
+  management_interface:
+    interfaces:
+      - name: eno1
+      - name: eno2
+    method: static
+    ip: 10.10.10.12
+    subnet_mask: 255.255.255.0
+    gateway: 10.10.10.1
+    default_route: true
+    mtu: 1500
+    vlan_id: 0                                        # mgmt is native/untagged VLAN 10 on the switch
+    bond_options:
+      # active-backup needs no switch config (no MLAG dependency for the control plane).
+      mode: active-backup
+      miimon: 100

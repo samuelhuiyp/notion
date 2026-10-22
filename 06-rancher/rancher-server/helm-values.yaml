@@ -1,0 +1,27 @@
+# -----------------------------------------------------------------------------
+# Rancher Manager — Helm values. Runs on a SEPARATE 3-node RKE2 cluster, not on
+# Harvester's embedded Rancher and not as VMs on the Harvester cluster it manages
+# (if Harvester is down you lose the tool you need to fix it).
+#   helm repo add rancher-prime <prime repo URL from SUSE Customer Center>
+#   helm upgrade --install rancher rancher-prime/rancher -n cattle-system \
+#     --create-namespace --version <pin> -f 06-rancher/rancher-server/helm-values.yaml
+# Check the Harvester <-> Rancher support matrix before choosing versions:
+#   https://www.suse.com/suse-harvester/support-matrix/
+# -----------------------------------------------------------------------------
+hostname: rancher.corp.example.com
+replicas: 3
+ingress:
+  tls:
+    source: secret                # corporate CA cert in Secret tls-rancher-ingress
+privateCA: true                   # also create Secret tls-ca with cacerts.pem
+bootstrapPassword: ""             # set via --set-file / external secret at install; rotate after first login
+auditLog:
+  level: 1
+  destination: sidecar
+  maxAge: 30
+  maxBackup: 10
+  maxSize: 100
+antiAffinity: required
+priorityClassName: rancher-critical
+useBundledSystemChart: false
+# agentTLSMode: strict           # Rancher 2.9+: enforce CA validation by agents

@@ -1,0 +1,34 @@
+# -----------------------------------------------------------------------------
+# NetApp ONTAP NAS (NFSv4.1) backend -> CAPACITY tier on external storage.
+# Filesystem volumes (no raw block). Good for Kasten FileStore, file shares,
+# bulk data disks where supported.
+# Docs: https://docs.netapp.com/us-en/trident/trident-use/ontap-nas-examples.html
+# -----------------------------------------------------------------------------
+apiVersion: trident.netapp.io/v1
+kind: TridentBackendConfig
+metadata:
+  name: ontap-nas-capacity
+  namespace: trident
+spec:
+  version: 1
+  storageDriverName: ontap-nas
+  backendName: ontap-nas-capacity
+  managementLIF: 10.10.10.200
+  dataLIF: 10.10.23.100          # NFS VLAN 23, reached via host bond-ext.23
+  svm: svm_harvester
+  credentials:
+    name: backend-ontap-secret
+  autoExportPolicy: true         # Trident manages export rules per node IP
+  autoExportCIDRs:
+    - 10.10.23.0/24
+  nfsMountOptions: nfsvers=4.1,hard,nconnect=8,rsize=1048576,wsize=1048576
+  limitVolumeSize: 16Ti
+  defaults:
+    spaceReserve: none
+    snapshotPolicy: none
+    snapshotReserve: "0"
+    snapshotDir: "false"
+    unixPermissions: "0770"
+  labels:
+    tier: capacity
+    protocol: nfs

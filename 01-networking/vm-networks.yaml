@@ -1,0 +1,48 @@
+# -----------------------------------------------------------------------------
+# VM networks = Multus NetworkAttachmentDefinitions of type L2VlanNetwork.
+# Kept in namespace vm-networks and referenced as "vm-networks/<name>" by VMs in
+# any namespace. Bridge name is "<clusterNetwork>-br".
+# IPAM is empty: addressing comes from the upstream DHCP/IPAM (or static in the guest);
+# Harvester only bridges L2. The route annotation lets the UI show the gateway.
+# -----------------------------------------------------------------------------
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: vlan100-prod
+  namespace: vm-networks
+  labels:
+    network.harvesterhci.io/clusternetwork: vmnet
+    network.harvesterhci.io/type: L2VlanNetwork
+    network.harvesterhci.io/vlan-id: "100"
+  annotations:
+    network.harvesterhci.io/route: '{"mode":"manual","serverIPAddr":"","cidr":"10.100.0.0/22","gateway":"10.100.0.1"}'
+spec:
+  config: '{"cniVersion":"0.3.1","name":"vlan100-prod","type":"bridge","bridge":"vmnet-br","promiscMode":true,"vlan":100,"ipam":{}}'
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: vlan110-dmz
+  namespace: vm-networks
+  labels:
+    network.harvesterhci.io/clusternetwork: vmnet
+    network.harvesterhci.io/type: L2VlanNetwork
+    network.harvesterhci.io/vlan-id: "110"
+  annotations:
+    network.harvesterhci.io/route: '{"mode":"manual","serverIPAddr":"","cidr":"10.110.0.0/24","gateway":"10.110.0.1"}'
+spec:
+  config: '{"cniVersion":"0.3.1","name":"vlan110-dmz","type":"bridge","bridge":"vmnet-br","promiscMode":true,"vlan":110,"ipam":{}}'
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: vlan120-dev
+  namespace: vm-networks
+  labels:
+    network.harvesterhci.io/clusternetwork: vmnet
+    network.harvesterhci.io/type: L2VlanNetwork
+    network.harvesterhci.io/vlan-id: "120"
+  annotations:
+    network.harvesterhci.io/route: '{"mode":"manual","serverIPAddr":"","cidr":"10.120.0.0/23","gateway":"10.120.0.1"}'
+spec:
+  config: '{"cniVersion":"0.3.1","name":"vlan120-dev","type":"bridge","bridge":"vmnet-br","promiscMode":true,"vlan":120,"ipam":{}}'

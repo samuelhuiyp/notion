@@ -1,0 +1,12 @@
+# -----------------------------------------------------------------------------
+# Dedicated live-migration network (Harvester v1.5+ setting "vm-migration-network").
+# Without it, migrations ride the mgmt network and can starve the control plane.
+# Placed on vmnet (25G LACP) rather than storage so a mass migration (node drain)
+# does not compete with Longhorn rebuilds that the same drain triggers.
+# VERIFY: setting name/shape against your Harvester release docs.
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: vm-migration-network
+value: '{"vlan":30,"clusterNetwork":"vmnet","range":"10.10.30.0/24","exclude":["10.10.30.1/32"]}'

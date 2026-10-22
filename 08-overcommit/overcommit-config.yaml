@@ -1,0 +1,26 @@
+# -----------------------------------------------------------------------------
+# Cluster-wide overcommit ratios (percent). Harvester's webhook sets each VM's
+# requests = limits * 100 / ratio, so the scheduler packs more VMs per node.
+#   Harvester defaults: cpu 1600 (16:1), memory 150, storage 200
+#   This baseline:      cpu 400  (4:1),  memory 120, storage 200
+#
+# Why these values:
+#  cpu 400     4 vCPU per physical thread is a common safe ceiling for mixed
+#              production; 16:1 only suits VDI/idle dev. Watch CPU ready/steal
+#              (node_cpu + VM vcpu wait metrics) and raise only with data.
+#  memory 120  Memory overcommit has no safety net on Harvester (no swap):
+#              exhausted node memory = virt-launcher OOM kill = VM crash.
+#              20% is covered by KSM on workers + unused guest RAM. Use 100
+#              (no overcommit) if the cluster is mostly databases.
+#  storage 200 Thin provisioning 2:1, aligned with Longhorn
+#              storage-over-provisioning-percentage (03-storage-classes). Requires
+#              disk-usage alerting at 70/80%.
+# Pinned-CPU VMs (dedicatedCpuPlacement) and VMs with explicit requests are not
+# reduced by this setting.
+# Docs: https://docs.harvesterhci.io/latest/advanced/settings#overcommit-config
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: overcommit-config
+value: '{"cpu":400,"memory":120,"storage":200}'

@@ -1,0 +1,49 @@
+# -----------------------------------------------------------------------------
+# Rancher -> Harvester node driver: machine pool template for RKE2 guest clusters.
+# Apply on the RANCHER cluster. Requires a Harvester cloud credential
+# (Cluster Management > Cloud Credentials > Harvester) named below.
+# Fields live at the top level (no spec) for rke-machine-config objects.
+# -----------------------------------------------------------------------------
+apiVersion: rke-machine-config.cattle.io/v1
+kind: HarvesterConfig
+metadata:
+  name: rke2-prod-cp
+  namespace: fleet-default
+cpuCount: "4"
+memorySize: "16"                  # GiB
+reservedMemorySize: "-1"          # use Harvester default
+diskInfo: '{"disks":[{"imageName":"harvester-public/sles15-sp6-perf","size":80,"bootOrder":1}]}'
+networkInfo: '{"interfaces":[{"networkName":"vm-networks/vlan100-prod"}]}'
+sshUser: sles
+vmNamespace: rke2-guests
+vmAffinity: ""                    # base64 affinity JSON; see rke2-guest-cluster.yaml note on spreading
+userData: |
+  #cloud-config
+  package_update: true
+  packages:
+    - qemu-guest-agent
+    - iptables
+  runcmd:
+    - systemctl enable --now qemu-guest-agent
+---
+apiVersion: rke-machine-config.cattle.io/v1
+kind: HarvesterConfig
+metadata:
+  name: rke2-prod-worker
+  namespace: fleet-default
+cpuCount: "8"
+memorySize: "32"
+reservedMemorySize: "-1"
+diskInfo: '{"disks":[{"imageName":"harvester-public/sles15-sp6-perf","size":120,"bootOrder":1}]}'
+networkInfo: '{"interfaces":[{"networkName":"vm-networks/vlan100-prod"}]}'
+sshUser: sles
+vmNamespace: rke2-guests
+vmAffinity: ""
+userData: |
+  #cloud-config
+  package_update: true
+  packages:
+    - qemu-guest-agent
+    - iptables
+  runcmd:
+    - systemctl enable --now qemu-guest-agent

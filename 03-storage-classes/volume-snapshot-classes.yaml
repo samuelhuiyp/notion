@@ -1,0 +1,35 @@
+# -----------------------------------------------------------------------------
+# VolumeSnapshotClasses for Kasten. Kasten uses the class annotated
+# k10.kasten.io/is-snapshot-class=true — exactly ONE per CSI driver.
+# Harvester's own built-ins ("longhorn-snapshot", "longhorn") are left untouched.
+# -----------------------------------------------------------------------------
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: k10-longhorn-snap
+  annotations:
+    k10.kasten.io/is-snapshot-class: "true"
+driver: driver.longhorn.io
+deletionPolicy: Delete
+parameters:
+  type: snap                      # in-cluster snapshot; Kasten exports the data to the backup location
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: trident-snapclass
+  annotations:
+    k10.kasten.io/is-snapshot-class: "true"
+driver: csi.trident.netapp.io
+deletionPolicy: Delete
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: px-csi-snapclass
+  annotations:
+    k10.kasten.io/is-snapshot-class: "true"
+driver: pxd.portworx.com
+deletionPolicy: Delete
+parameters:
+  csi.openstorage.org/snapshot-type: local

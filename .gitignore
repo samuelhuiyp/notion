@@ -1,0 +1,9 @@
+# Never commit real credentials. Copy *.example.yaml -> *.secret.yaml (ignored),
+# or encrypt with SOPS/age and commit *.enc.yaml instead.
+*.secret.yaml
+*.secret.yml
+secrets/*.yaml
+!secrets/*.example.yaml
+.env
+*.kubeconfig
+kubeconfig*

@@ -1,0 +1,17 @@
+# -----------------------------------------------------------------------------
+# NetApp Trident operator — Helm values
+#   helm repo add netapp-trident https://netapp.github.io/trident-helm-chart
+#   helm upgrade --install trident netapp-trident/trident-operator -n trident \
+#     --create-namespace --version <pin> -f 02-storage-drivers/netapp-trident/helm-values.yaml
+# Check the Trident support matrix for your Harvester/RKE2 Kubernetes version.
+# Docs: https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-helm.html
+# Host prerequisites (iscsid, multipathd, nfs-client) come from host-prereqs/.
+# -----------------------------------------------------------------------------
+tridentLogFormat: json
+tridentDebug: false
+tridentAutosupportImage: ""     # set if your org allows AutoSupport
+tridentSilenceAutosupport: true
+imagePullPolicy: IfNotPresent
+# iSCSI self-healing re-logs stale sessions — helps after a fabric outage.
+iscsiSelfHealingInterval: 5m0s
+iscsiSelfHealingWaitTime: 7m0s

@@ -1,0 +1,18 @@
+# -----------------------------------------------------------------------------
+# Live-migration tuning on the KubeVirt CR. Harvester manages this CR through its
+# chart and MAY revert it on upgrade — re-check after upgrades:
+#   kubectl -n harvester-system patch kubevirt kubevirt --type merge \
+#     --patch-file 07-optimisation/kubevirt-migration-tuning.patch.yaml
+# Values assume the dedicated 25G migration VLAN (01-networking/vm-migration-network.yaml).
+# Docs: https://kubevirt.io/user-guide/compute/live_migration/
+# -----------------------------------------------------------------------------
+spec:
+  configuration:
+    migrations:
+      parallelMigrationsPerCluster: 5
+      parallelOutboundMigrationsPerNode: 2   # node drain moves 2 VMs at a time
+      bandwidthPerMigration: 0               # 0 = unlimited; the network is dedicated
+      completionTimeoutPerGiB: 800
+      progressTimeout: 150
+      allowAutoConverge: true                # throttles busy guests so migration can finish
+      allowPostCopy: false                   # post-copy: a network blip mid-migration = VM lost

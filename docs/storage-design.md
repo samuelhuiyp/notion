@@ -1,0 +1,43 @@
+# Storage design
+
+## Overview
+
+| StorageClass | Backend | Media | Protection | Volume mode | Live migration | Use for |
+|--------------|---------|-------|-----------|-------------|----------------|---------|
+| `lh-performance` *(default)* | Longhorn | local NVMe (tag `nvme`) | 3 replicas, best-effort locality | Block RWX | yes | DB, latency-sensitive VMs, root disks |
+| `lh-performance-retain` | Longhorn | local NVMe | 3 replicas, Retain | Block RWX | yes | Critical data disks |
+| `lh-capacity` | Longhorn | local SATA/QLC (tag `capacity`) | 2 replicas | Block RWX | yes | File servers, bulk, dev |
+| `netapp-san-performance` | Trident ontap-san (iSCSI) | AFF | array RAID-TEC + snapshots | Block RWX | yes | Large DBs, array-side snapshot/DR |
+| `netapp-nas-capacity` | Trident ontap-nas (NFSv4.1) | AFF/FAS | array | Filesystem RWX | release-dependent | Shares, archive |
+| `nfs-capacity` | csi-driver-nfs | generic filer | filer | Filesystem RWX | release-dependent | Kasten FileStore, ISO library |
+| `px-performance` | Portworx | NVMe pool | repl 3 | Block, sharedv4 | yes (check PX version) | If Portworx replaces Longhorn |
+| `px-capacity` | Portworx | SATA pool | repl 2 | Block, sharedv4 | yes | — |
+| `harvester-longhorn` *(built-in)* | Longhorn | default data disk | 3 replicas | Block RWX | yes | Left for Harvester internals and images |
+
+## Disk layout per node (assumed)
+
+```
+boot  RAID1 M.2 480G   -> Harvester OS
+nvme0 3.84T            -> Harvester data disk (images, harvester-longhorn)
+nvme1, nvme2           -> Longhorn tag "nvme"      (lh-performance)
+nvme3, nvme4           -> Portworx (raw)           (px-performance)
+sdb, sdc   7.68T       -> Longhorn tag "capacity"  (lh-capacity)
+sdd, sde   7.68T       -> Portworx (raw)           (px-capacity)
+```
+
+## Design reasoning
+
+**Why 3 replicas for performance but 2 for capacity.** With 3 replicas, the volume stays writable with full redundancy during a planned node drain while also surviving one unplanned failure. Two replicas save 33% raw capacity but leave a single copy during any maintenance. That's acceptable only because capacity-tier data is also exported off-cluster by Kasten. If a capacity-tier workload has no backup, use 3.
+
+**Why `dataLocality: best-effort` on performance.** Reads come from the local NVMe instead of across the storage network. The cost is that after every live migration Longhorn rebuilds a local replica on the new node. If VMs migrate often (for example, the descheduler is very active), switch to `disabled`.
+
+**Why `migratable: "true"`.** Harvester live migration needs RWX block volumes. Longhorn provides this for "migratable" volumes. Without it, VMs can't be live-migrated, and node drains will shut VMs down.
+
+**Why a deny-by-default multipath config.** See `02-storage-drivers/host-prereqs/cloudinit-multipath.yaml`. Longhorn volumes appear as local iSCSI LUNs. If multipathd grabs them, every Longhorn volume breaks. Allow-listing only `NETAPP LUN.*` removes that failure mode completely.
+
+**Why images are pinned to a tier.** A VM's root disk created from a Longhorn image inherits the image's StorageClass parameters. The `harvesterhci.io/storageClassName` annotation (see `03-storage-classes/vm-image-example.yaml`) decides which tier the VM's root disk can land on.
+
+## Capacity math (raw → usable, 5 nodes)
+
+- **Longhorn perf:** 5 × 2 × 3.84T = 38.4T raw. ÷3 replicas = 12.8T. −25% reserve ≈ **9.6T usable** (thin 2:1 → up to 19T provisioned)
+- **Longhorn capacity:** 5 × 2 × 7.68T = 76.8T raw. ÷2 replicas = 38.4T. −25% ≈ **28.8T usable**

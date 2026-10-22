@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Addon patches (addons/*.patch.yaml) are applied with `kubectl patch` (see README),
+# not here: Addon objects already exist and a full apply could overwrite chart versions.
+# VM profiles are examples, not cluster config.
+resources:
+  - harvester-settings.yaml
+  - node-tuning-cloudinit.yaml
+  - ksmtuned.yaml

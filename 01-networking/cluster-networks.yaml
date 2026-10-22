@@ -1,0 +1,21 @@
+# -----------------------------------------------------------------------------
+# Cluster networks (Harvester). "mgmt" is built in and created by the installer.
+# Each cluster network becomes a Linux bridge "<name>-br" on its uplink bond
+# "<name>-bo". Names must be <= 12 characters.
+# Docs: https://docs.harvesterhci.io/latest/networking/clusternetwork
+#
+# Traffic separation (assumed 8 ports per node — see docs/network-design.md):
+#   mgmt    : eno1+eno2     10G  active-backup  -> host mgmt, API, UI, Rancher agent
+#   vmnet   : ens1f0+ens2f0 25G  LACP           -> VM VLANs 100/110/120 + live migration VLAN 30
+#   storage : ens1f1+ens3f0 25G  LACP, MTU 9000 -> Longhorn replication VLAN 20
+#   (bond-ext on ens2f1+ens3f1 is host-managed, NOT a cluster network — see host-storage-interfaces/)
+# -----------------------------------------------------------------------------
+apiVersion: network.harvesterhci.io/v1beta1
+kind: ClusterNetwork
+metadata:
+  name: vmnet
+---
+apiVersion: network.harvesterhci.io/v1beta1
+kind: ClusterNetwork
+metadata:
+  name: storage

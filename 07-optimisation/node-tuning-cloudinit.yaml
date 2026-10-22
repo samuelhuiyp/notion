@@ -1,0 +1,29 @@
+# -----------------------------------------------------------------------------
+# Persistent host tuning on all nodes (same values as install-config os.sysctls,
+# so nodes installed with an older config converge). Applied at boot.
+# Kept deliberately small: Harvester already tunes KVM/Longhorn; every extra
+# knob is one more thing to re-validate on each Harvester upgrade.
+# -----------------------------------------------------------------------------
+apiVersion: node.harvesterhci.io/v1beta1
+kind: CloudInit
+metadata:
+  name: node-tuning
+spec:
+  matchSelector: {}
+  filename: 97_node_tuning.yaml
+  contents: |
+    stages:
+      initramfs:
+        - name: "sysctl tuning for 25GbE + many VMs"
+          sysctl:
+            net.core.rmem_max: "134217728"
+            net.core.wmem_max: "134217728"
+            net.core.netdev_max_backlog: "250000"
+            net.ipv4.tcp_rmem: "4096 87380 67108864"
+            net.ipv4.tcp_wmem: "4096 65536 67108864"
+            net.ipv4.tcp_mtu_probing: "1"
+            vm.max_map_count: "262144"
+            fs.inotify.max_user_instances: "8192"
+            fs.inotify.max_user_watches: "1048576"
+            fs.aio-max-nr: "1048576"
+  paused: false

@@ -1,0 +1,40 @@
+# -----------------------------------------------------------------------------
+# Portworx tiers (only if 04-portworx is deployed)
+#   px-performance : NVMe pool (io_priority high), repl 3
+#   px-capacity    : SATA pool (io_priority low),  repl 2
+# sharedv4 makes volumes RWX so KubeVirt live migration works; confirm the
+# minimum Portworx version for RWX *block* KubeVirt volumes in the PX docs.
+# Docs: https://docs.portworx.com/portworx-enterprise/reference/crd/storage-class
+# -----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: px-performance
+  annotations:
+    description: "Portworx tier 1 - NVMe pool, 3 replicas, RWX for live migration"
+provisioner: pxd.portworx.com
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  repl: "3"
+  priority_io: "high"
+  io_profile: "auto"
+  sharedv4: "true"
+  nodiscard: "false"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: px-capacity
+  annotations:
+    description: "Portworx tier 2 - SATA pool, 2 replicas"
+provisioner: pxd.portworx.com
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  repl: "2"
+  priority_io: "low"
+  io_profile: "auto"
+  sharedv4: "true"

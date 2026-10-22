@@ -1,0 +1,16 @@
+# -----------------------------------------------------------------------------
+# Step 1 — apply on the RANCHER cluster (or UI: Virtualization Management >
+# Import Existing). Creates the placeholder for the Harvester cluster.
+# Then read the registration URL:
+#   kubectl -n fleet-default get clusterregistrationtoken.management.cattle.io \
+#     -o jsonpath='{.items[?(@.spec.clusterName=="<c-m-xxxx>")].status.manifestUrl}'
+# Docs: https://docs.harvesterhci.io/latest/rancher/virtualization-management
+# -----------------------------------------------------------------------------
+apiVersion: provisioning.cattle.io/v1
+kind: Cluster
+metadata:
+  name: harvester-prod
+  namespace: fleet-default
+  labels:
+    provider.cattle.io: harvester
+spec: {}
