@@ -32,3 +32,4 @@ spec:
   labels:
     tier: capacity
     protocol: nfs
+    pool: nas-nfs

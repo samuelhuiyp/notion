@@ -3,7 +3,10 @@ kind: Kustomization
 # Helm charts (nfs-csi, trident) are installed separately with the helm-values
 # files in each folder; this kustomization holds the plain manifests only.
 # Secrets (secrets/*.example.yaml) are deliberately NOT listed.
+# netapp-ontap-setup/ is array-side (Ansible/ONTAP CLI) and runs BEFORE this stage.
 resources:
-  - host-prereqs/cloudinit-multipath.yaml
+  - host-prereqs/cloudinit-nvme-tcp.yaml     # default external block protocol
+  - host-prereqs/cloudinit-multipath.yaml    # iSCSI fallback only
+  - netapp-trident/backend-ontap-san-nvme.yaml
   - netapp-trident/backend-ontap-san.yaml
   - netapp-trident/backend-ontap-nas.yaml

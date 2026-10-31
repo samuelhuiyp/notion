@@ -1,0 +1,153 @@
+# -----------------------------------------------------------------------------
+# ONTAP configuration for Harvester NVMe/TCP (Trident ontap-san, sanType: nvme).
+# Idempotent; safe to re-run. Uses the netapp.ontap collection over REST.
+#
+#   ansible-galaxy collection install netapp.ontap      # pin a version in requirements.yml
+#   ansible-playbook playbook-nvme-tcp.yaml -e @vars.yaml -e @vault.yaml --ask-vault-pass --check
+#   ansible-playbook playbook-nvme-tcp.yaml -e @vars.yaml -e @vault.yaml --ask-vault-pass
+#
+# vault.yaml (encrypt with ansible-vault; git-ignored so a plaintext copy is never committed):
+#   ontap_admin_password: ...
+#   trident_password: ...              # same value as backend-ontap-secret
+#
+# What Trident does itself (NOT configured here): volumes, namespaces, NVMe
+# subsystems and host NQN mappings — one subsystem per Harvester node.
+# Module docs (verify options against your collection version):
+#   https://docs.ansible.com/ansible/latest/collections/netapp/ontap/
+# -----------------------------------------------------------------------------
+- name: Configure ONTAP SVM for Harvester NVMe/TCP
+  hosts: localhost
+  gather_facts: false
+  collections:
+    - netapp.ontap
+  vars:
+    login: &login
+      hostname: "{{ ontap_cluster_mgmt }}"
+      username: "{{ ontap_admin_user }}"
+      password: "{{ ontap_admin_password }}"
+      https: true
+      validate_certs: "{{ ontap_validate_certs }}"
+      use_rest: always
+
+  tasks:
+    # ---- 1. Network: VLAN ports + broadcast domains with jumbo frames -------
+    - name: Create NVMe VLAN ports on each node's ifgrp
+      na_ontap_net_vlan:
+        <<: *login
+        state: present
+        node: "{{ item.0.name }}"
+        parent_interface: "{{ item.0.ifgrp }}"
+        vlanid: "{{ item.1.vlan }}"
+      loop: "{{ ontap_nodes | product(nvme_fabrics) | list }}"
+      loop_control:
+        label: "{{ item.0.name }}:{{ item.0.ifgrp }}-{{ item.1.vlan }}"
+
+    - name: Create one broadcast domain per NVMe fabric (MTU 9000)
+      na_ontap_broadcast_domain:
+        <<: *login
+        state: present
+        name: "bd-{{ item.name }}"
+        ipspace: Default
+        mtu: "{{ nvme_mtu }}"
+        # -> ["aff-01:a0a-25", "aff-02:a0a-25"]
+        ports: "{{ ontap_nodes | map(attribute='name') | zip(ontap_nodes | map(attribute='ifgrp')) | map('join', ':') | map('regex_replace', '$', '-' ~ item.vlan) | list }}"
+      loop: "{{ nvme_fabrics }}"
+      loop_control:
+        label: "bd-{{ item.name }}"
+
+    # ---- 2. SVM ---------------------------------------------------------------
+    - name: Create SVM (only when svm_create=true)
+      when: svm_create | bool
+      na_ontap_svm:
+        <<: *login
+        state: present
+        name: "{{ svm_name }}"
+        root_volume: "{{ svm_name }}_root"
+        root_volume_aggregate: "{{ svm_root_aggr }}"
+        root_volume_security_style: unix
+
+    - name: Allow NVMe (+ iSCSI fallback, NFS) and assign aggregates to the SVM
+      na_ontap_svm:
+        <<: *login
+        state: present
+        name: "{{ svm_name }}"
+        aggr_list: "{{ ontap_nodes | map(attribute='aggr') | list }}"   # Trident requires an aggr list on the SVM
+        services:
+          nvme:
+            allowed: true
+          iscsi:
+            allowed: true
+          nfs:
+            allowed: true
+
+    - name: Enable the NVMe service on the SVM
+      na_ontap_nvme:
+        <<: *login
+        state: present
+        vserver: "{{ svm_name }}"
+        status_admin: true
+
+    # ---- 3. LIFs ----------------------------------------------------------------
+    - name: SVM management LIF (Trident managementLIF)
+      na_ontap_interface:
+        <<: *login
+        state: present
+        vserver: "{{ svm_name }}"
+        interface_name: "{{ svm_mgmt_lif.name }}"
+        interface_type: ip
+        home_node: "{{ svm_mgmt_lif.node }}"
+        home_port: "{{ svm_mgmt_lif.port }}"
+        address: "{{ svm_mgmt_lif.address }}"
+        netmask: "{{ svm_mgmt_lif.netmask }}"
+        service_policy: default-management
+        admin_status: up
+
+    - name: NVMe/TCP data LIFs, one per node per fabric (SAN LIFs never fail over; ANA handles paths)
+      na_ontap_interface:
+        <<: *login
+        state: present
+        vserver: "{{ svm_name }}"
+        interface_name: "{{ item.0.name | replace('-', '_') }}_{{ item.1.node | replace('-', '_') }}"
+        interface_type: ip
+        home_node: "{{ item.1.node }}"
+        home_port: "{{ (ontap_nodes | selectattr('name', 'equalto', item.1.node) | first).ifgrp }}-{{ item.0.vlan }}"
+        address: "{{ item.1.address }}"
+        netmask: "{{ item.0.netmask }}"
+        service_policy: default-data-nvme-tcp
+        admin_status: up
+      loop: "{{ nvme_fabrics | subelements('lifs') }}"
+      loop_control:
+        label: "{{ item.0.name }} {{ item.1.node }} {{ item.1.address }}"
+
+    # ---- 4. Least-privilege account for Trident (REST) -------------------------
+    - name: Trident service account (SVM-scoped vsadmin over HTTP/REST)
+      na_ontap_user:
+        <<: *login
+        state: present
+        name: "{{ trident_user }}"
+        vserver: "{{ svm_name }}"
+        role_name: vsadmin
+        application_dicts:
+          - application: http
+            authentication_methods: [password]
+        set_password: "{{ trident_password }}"
+      no_log: true
+
+    # ---- 5. Show the result -----------------------------------------------------
+    - name: Read back NVMe LIFs
+      na_ontap_rest_info:
+        <<: *login
+        gather_subset:
+          - network/ip/interfaces
+        parameters:
+          svm.name: "{{ svm_name }}"
+        fields:
+          - name
+          - ip
+          - services
+          - location
+      register: lifs
+
+    - name: Print LIFs
+      ansible.builtin.debug:
+        var: lifs.ontap_info

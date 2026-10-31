@@ -1,5 +1,6 @@
 # -----------------------------------------------------------------------------
-# dm-multipath for external iSCSI LUNs (NetApp ontap-san / any SAN array).
+# dm-multipath for external iSCSI LUNs (iSCSI FALLBACK path; NVMe/TCP is the
+# default and uses native NVMe multipath instead — see cloudinit-nvme-tcp.yaml).
 # Harvester ships multipathd DISABLED because it collides with Longhorn: Longhorn
 # v1 exposes every volume as a local iSCSI LUN (vendor "IET", product
 # "VIRTUAL-DISK"); if multipathd claims those, Longhorn volumes fail to attach.

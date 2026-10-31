@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 yamllint -s .
 if command -v kubeconform >/dev/null; then
   find . -name '*.yaml' -not -path './00-node-deployment/install-config/*' \
-    -not -name '*helm-values*' -not -name '*.patch.yaml' -not -name '*.template.yaml' -not -name 'kustomization.yaml' -not -path './inventory/*' \
+    -not -name '*helm-values*' -not -name '*.patch.yaml' -not -name '*.template.yaml' -not -name 'kustomization.yaml' -not -path './inventory/*' -not -path './02-storage-drivers/netapp-ontap-setup/*' \
     -not -path './.git/*' -print0 | xargs -0 kubeconform -strict -ignore-missing-schemas -summary
 fi
 for k in $(find . -name kustomization.yaml -exec dirname {} \;); do

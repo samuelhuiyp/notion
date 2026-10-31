@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# Host-level interfaces for EXTERNAL storage on hv01 (iSCSI A/B, NFS, Portworx data).
+# Host-level interfaces for EXTERNAL storage (NVMe/TCP A/B, iSCSI A/B, NFS, Portworx) on hv01
 # Why host-level: Harvester cluster networks only give VMs/pods L2 access; CSI
 # node plugins (Trident, NFS CSI, Portworx) run in the host network namespace and
 # need a host IP on the storage VLANs.
@@ -9,8 +9,9 @@
 # is based on SL Micro 6 / NetworkManager, convert to keyfiles — VERIFY before use.
 # Docs: https://docs.harvesterhci.io/latest/advanced/cloudinitcrd
 #
-# Design: ens2f1+ens3f1 LACP bond (physical redundancy) + two iSCSI VLANs on
-# separate subnets so dm-multipath sees >= 2 independent paths per LUN.
+# Design: ens2f1+ens3f1 LACP bond (physical redundancy) + per-protocol fabric
+# VLAN pairs on separate subnets, so native NVMe multipath (VLAN 25/26, default)
+# and dm-multipath for iSCSI (VLAN 21/22, fallback) each see >= 2 paths.
 # -----------------------------------------------------------------------------
 apiVersion: node.harvesterhci.io/v1beta1
 kind: CloudInit
@@ -80,5 +81,23 @@ spec:
                 ETHERDEVICE='bond-ext'
                 VLAN_ID='24'
                 IPADDR='10.10.24.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.25
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='25'
+                IPADDR='10.10.25.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.26
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='26'
+                IPADDR='10.10.26.11/24'
                 MTU='9000'
   paused: false

@@ -17,11 +17,11 @@ cluster:
 
 nodes:
   # role: management = control plane + etcd + workloads; worker = workloads only
-  - {name: hv01, mode: create, role: management, mgmtIp: 10.10.10.11, iscsiA: 10.10.21.11, iscsiB: 10.10.22.11, nfs: 10.10.23.11, pxData: 10.10.24.11, zone: rack-a}
-  - {name: hv02, mode: join,   role: management, mgmtIp: 10.10.10.12, iscsiA: 10.10.21.12, iscsiB: 10.10.22.12, nfs: 10.10.23.12, pxData: 10.10.24.12, zone: rack-b}
-  - {name: hv03, mode: join,   role: management, mgmtIp: 10.10.10.13, iscsiA: 10.10.21.13, iscsiB: 10.10.22.13, nfs: 10.10.23.13, pxData: 10.10.24.13, zone: rack-c}
-  - {name: hv04, mode: join,   role: worker,     mgmtIp: 10.10.10.14, iscsiA: 10.10.21.14, iscsiB: 10.10.22.14, nfs: 10.10.23.14, pxData: 10.10.24.14, zone: rack-a}
-  - {name: hv05, mode: join,   role: worker,     mgmtIp: 10.10.10.15, iscsiA: 10.10.21.15, iscsiB: 10.10.22.15, nfs: 10.10.23.15, pxData: 10.10.24.15, zone: rack-b}
+  - {name: hv01, mode: create, role: management, mgmtIp: 10.10.10.11, iscsiA: 10.10.21.11, iscsiB: 10.10.22.11, nvmeA: 10.10.25.11, nvmeB: 10.10.26.11, nfs: 10.10.23.11, pxData: 10.10.24.11, zone: rack-a}
+  - {name: hv02, mode: join,   role: management, mgmtIp: 10.10.10.12, iscsiA: 10.10.21.12, iscsiB: 10.10.22.12, nvmeA: 10.10.25.12, nvmeB: 10.10.26.12, nfs: 10.10.23.12, pxData: 10.10.24.12, zone: rack-b}
+  - {name: hv03, mode: join,   role: management, mgmtIp: 10.10.10.13, iscsiA: 10.10.21.13, iscsiB: 10.10.22.13, nvmeA: 10.10.25.13, nvmeB: 10.10.26.13, nfs: 10.10.23.13, pxData: 10.10.24.13, zone: rack-c}
+  - {name: hv04, mode: join,   role: worker,     mgmtIp: 10.10.10.14, iscsiA: 10.10.21.14, iscsiB: 10.10.22.14, nvmeA: 10.10.25.14, nvmeB: 10.10.26.14, nfs: 10.10.23.14, pxData: 10.10.24.14, zone: rack-a}
+  - {name: hv05, mode: join,   role: worker,     mgmtIp: 10.10.10.15, iscsiA: 10.10.21.15, iscsiB: 10.10.22.15, nvmeA: 10.10.25.15, nvmeB: 10.10.26.15, nfs: 10.10.23.15, pxData: 10.10.24.15, zone: rack-b}
 
 hardwarePerNode:
   cpu: 2x 32-core (64c/128t)
@@ -30,7 +30,7 @@ hardwarePerNode:
     eno1/eno2:     {speed: 10G, use: "mgmt (active-backup)"}
     ens1f0/ens2f0: {speed: 25G, use: "cluster network 'vmnet' (LACP) — VM VLANs + live migration"}
     ens1f1/ens3f0: {speed: 25G, use: "cluster network 'storage' (LACP, MTU 9000) — Longhorn replication"}
-    ens2f1/ens3f1: {speed: 25G, use: "host bond 'bond-ext' (LACP, MTU 9000) — iSCSI A/B, NFS, Portworx"}
+    ens2f1/ens3f1: {speed: 25G, use: "host bond 'bond-ext' (LACP, MTU 9000) — NVMe/TCP A/B (default), iSCSI A/B (fallback), NFS, Portworx"}
   disks:
     boot:     {dev: "/dev/disk/by-id/<BOSS-RAID1>",   size: 480G,  use: Harvester OS}
     data:     {dev: "/dev/disk/by-id/<nvme0>",        size: 3.84T, use: "Harvester data disk (VM images, default Longhorn disk)"}
@@ -45,6 +45,8 @@ vlans:
   - {id: 21,  name: iscsi-a,       cidr: 10.10.21.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
   - {id: 22,  name: iscsi-b,       cidr: 10.10.22.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
   - {id: 23,  name: nfs,           cidr: 10.10.23.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 25,  name: nvme-tcp-a,    cidr: 10.10.25.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 26,  name: nvme-tcp-b,    cidr: 10.10.26.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
   - {id: 24,  name: px-data,       cidr: 10.10.24.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
   - {id: 30,  name: live-migration, cidr: 10.10.30.0/24, gw: null,      mtu: 9000, carrier: "vmnet cluster network"}
   - {id: 100, name: vm-prod,       cidr: 10.100.0.0/22, gw: 10.100.0.1, mtu: 1500, carrier: "vmnet cluster network"}
@@ -53,8 +55,12 @@ vlans:
 
 externalStorage:
   netapp:
-    managementLif: 10.10.10.200
+    model: "AFF HA pair (aff-01 / aff-02), ONTAP 9.10.1+ with NVMe/TCP"
+    clusterMgmt: 10.10.10.199
+    managementLif: 10.10.10.200        # SVM mgmt LIF used by Trident
     svm: svm_harvester
+    defaultBlockProtocol: nvme-tcp
+    nvmeTcpLifs: [10.10.25.101, 10.10.25.102, 10.10.26.101, 10.10.26.102]
     iscsiLifs: [10.10.21.101, 10.10.21.102, 10.10.22.101, 10.10.22.102]
     nfsLif: 10.10.23.100
   genericNfs:

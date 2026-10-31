@@ -15,7 +15,9 @@ docs/                              assumptions, network design, storage design, 
 01-networking/                     ClusterNetworks, VlanConfigs, VM VLAN NADs,
                                    Longhorn storage network, live-migration network,
                                    host-storage-interfaces/ (bond-ext + VLANs via CloudInit)
-02-storage-drivers/                multipath host prep, NFS CSI, generic iSCSI, NetApp Trident
+02-storage-drivers/                NVMe/TCP host prep (default) + multipath (iSCSI fallback), NFS CSI,
+                                   generic iSCSI, NetApp Trident backends,
+                                   netapp-ontap-setup/ (array-side Ansible playbook + CLI runbook)
 03-storage-classes/                performance/capacity tiers (Longhorn, NetApp, NFS, Portworx),
                                    Longhorn settings, VolumeSnapshotClasses, csi-driver-config
 04-portworx/                       Portworx StorageCluster
@@ -36,7 +38,8 @@ Directories are numbered in apply order. Each Kubernetes stage has a `kustomizat
 | 1 | Install hv01 (create), then hv02–hv05 (join), one at a time | `00-node-deployment/install-config/*.yaml` (render secrets with `envsubst`) |
 | 2 | Namespaces, node labels, disk tags | `kubectl apply -k 00-node-deployment/post-install`, `scripts/label-nodes.sh`, `scripts/tag-disks.sh` |
 | 3 | Networking (**before any VM exists**: storage-network needs all VMs stopped) | `kubectl apply -k 01-networking`, then reboot nodes one by one (maintenance mode) for host interfaces |
-| 4 | Storage drivers | `helm install` NFS CSI + Trident with values files, create secrets from `*.example.yaml`, `kubectl apply -k 02-storage-drivers`, rolling reboot for multipath |
+| 3b | ONTAP array: NVMe/TCP VLANs, LIFs, SVM services, Trident account | `02-storage-drivers/netapp-ontap-setup/` (`ansible-playbook ... --check` first) |
+| 4 | Storage drivers | `helm install` NFS CSI + Trident with values files, create secrets from `*.example.yaml`, `kubectl apply -k 02-storage-drivers`, rolling reboot for NVMe/TCP + multipath host prep |
 | 5 | Portworx (optional, see review notes) | install operator, `kubectl apply -k 04-portworx` |
 | 6 | Storage classes | `kubectl apply -k 03-storage-classes` (drop `portworx.yaml` if step 5 skipped), un-default `harvester-longhorn` |
 | 7 | Optimisation | `kubectl apply -k 07-optimisation`, `kubectl patch` addons and KubeVirt per file headers |

@@ -1,0 +1,49 @@
+# -----------------------------------------------------------------------------
+# ONTAP array-side variables for the Harvester NVMe/TCP setup.
+# ASSUMPTIONS: 2-node AFF HA pair (node names below), an LACP ifgrp "a0a" on each
+# node cabled to the same ToR pair as the Harvester hosts, data aggregates
+# aggr1_n1 / aggr1_n2. Run `network port ifgrp show` and `storage aggregate show`
+# and replace these with your real values.
+# Secrets: ontap_admin_password / trident_password come from Ansible Vault,
+# never from this file.
+# -----------------------------------------------------------------------------
+ontap_cluster_mgmt: 10.10.10.199         # cluster management LIF (Ansible connects here)
+ontap_admin_user: admin
+ontap_validate_certs: true
+
+ontap_nodes:
+  - name: aff-01
+    aggr: aggr1_n1
+    ifgrp: a0a
+  - name: aff-02
+    aggr: aggr1_n2
+    ifgrp: a0a
+
+svm_name: svm_harvester
+svm_create: false                        # true only if the SVM does not exist yet
+svm_root_aggr: aggr1_n1
+svm_mgmt_lif:
+  name: svm_harvester_mgmt
+  node: aff-01
+  port: e0M                              # or a mgmt VLAN port; must reach Harvester VLAN 10
+  address: 10.10.10.200                  # = managementLIF in the Trident backends
+  netmask: 255.255.255.0
+
+# NVMe/TCP fabrics: one VLAN/subnet per fabric, one LIF per node per fabric
+# = 4 paths per namespace (2 ANA-optimized via the owning node, 2 non-optimized).
+nvme_mtu: 9000
+nvme_fabrics:
+  - name: nvme-a
+    vlan: 25
+    netmask: 255.255.255.0
+    lifs:
+      - {node: aff-01, address: 10.10.25.101}
+      - {node: aff-02, address: 10.10.25.102}
+  - name: nvme-b
+    vlan: 26
+    netmask: 255.255.255.0
+    lifs:
+      - {node: aff-01, address: 10.10.26.101}
+      - {node: aff-02, address: 10.10.26.102}
+
+trident_user: trident-svc

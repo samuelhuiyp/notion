@@ -1,17 +1,19 @@
 # -----------------------------------------------------------------------------
-# NetApp ONTAP SAN (iSCSI) backend -> PERFORMANCE tier on external storage.
-# Block volumes, RWX-capable => supports Harvester live migration.
+# NetApp ONTAP SAN (iSCSI) backend -> FALLBACK block tier on external storage.
+# NVMe/TCP (backend-ontap-san-nvme.yaml) is the default. Keep this for VMs/LUNs
+# that must stay on iSCSI (e.g. migrated RDM-style LUNs, troubleshooting).
+# Remove this file + cloudinit-multipath.yaml if iSCSI is never needed.
 # Docs: https://docs.netapp.com/us-en/trident/trident-use/ontap-san-examples.html
 # -----------------------------------------------------------------------------
 apiVersion: trident.netapp.io/v1
 kind: TridentBackendConfig
 metadata:
-  name: ontap-san-perf
+  name: ontap-san-iscsi
   namespace: trident
 spec:
   version: 1
   storageDriverName: ontap-san
-  backendName: ontap-san-perf
+  backendName: ontap-san-iscsi
   managementLIF: 10.10.10.200
   svm: svm_harvester
   sanType: iscsi
@@ -28,3 +30,4 @@ spec:
   labels:
     tier: performance
     protocol: iscsi
+    pool: san-iscsi              # unique label -> StorageClass selector targets ONLY this backend

@@ -52,6 +52,7 @@ spec:
     lh-performance.storageclass.storage.k8s.io/requests.storage: "0"
     lh-performance-retain.storageclass.storage.k8s.io/requests.storage: "0"
     netapp-san-performance.storageclass.storage.k8s.io/requests.storage: "0"
+    netapp-san-iscsi.storageclass.storage.k8s.io/requests.storage: "0"
     px-performance.storageclass.storage.k8s.io/requests.storage: "0"
 ---
 apiVersion: v1

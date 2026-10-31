@@ -1,22 +1,44 @@
 # -----------------------------------------------------------------------------
 # NetApp (Trident) tiers — external storage
-#   netapp-san-performance : ontap-san / iSCSI, raw block, RWX -> live migration OK
+#   netapp-san-performance : ontap-san / NVMe/TCP (DEFAULT external block), raw block RWX
+#   netapp-san-iscsi       : ontap-san / iSCSI (fallback), raw block RWX
 #   netapp-nas-capacity    : ontap-nas / NFS, filesystem only
-# "selector" matches the labels on the TridentBackendConfig (02-storage-drivers).
+# "selector" matches the UNIQUE "pool" label on each TridentBackendConfig
+# (02-storage-drivers). Do not select on "tier" alone: both SAN backends carry
+# tier=performance, so Trident could place a volume on either protocol.
+# The cluster-wide default StorageClass stays lh-performance (local Longhorn);
+# see docs/storage-design.md for why and how to change it.
 # -----------------------------------------------------------------------------
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: netapp-san-performance
   annotations:
-    description: "External tier 1 - NetApp AFF iSCSI, array-side RAID/dedupe, RWX block"
+    description: "External tier 1 (default external block) - NetApp AFF over NVMe/TCP, RWX block"
 provisioner: csi.trident.netapp.io
 allowVolumeExpansion: true
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 parameters:
   backendType: ontap-san
-  selector: "tier=performance"
+  selector: "pool=san-nvme"
+  provisioningType: thin
+  snapshots: "true"
+  clones: "true"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: netapp-san-iscsi
+  annotations:
+    description: "External tier 1 fallback - NetApp AFF over iSCSI, RWX block"
+provisioner: csi.trident.netapp.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  backendType: ontap-san
+  selector: "pool=san-iscsi"
   provisioningType: thin
   snapshots: "true"
   clones: "true"
@@ -37,6 +59,6 @@ mountOptions:
   - nconnect=8
 parameters:
   backendType: ontap-nas
-  selector: "tier=capacity"
+  selector: "pool=nas-nfs"
   provisioningType: thin
   snapshots: "true"

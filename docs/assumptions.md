@@ -11,7 +11,7 @@ You weren't available to give input, so every value in this repo rests on the as
 | A3 | Hardware | 2×32c, 1 TiB RAM, 8 NIC ports, boot RAID1 + 1 data NVMe + 4 NVMe + 4 SATA SSD per node | install-config, disk map, NIC names |
 | A4 | Network | Redundant ToR pair with MLAG/vPC (LACP), jumbo frames on storage VLANs, VLAN plan below | 01-networking |
 | A5 | IP / DNS | Static IPs, mgmt 10.10.10.0/24, VIP .10, internal DNS + NTP exist, domain `corp.example.com` | inventory, install-config |
-| A6 | External storage | NetApp ONTAP (AFF) with one SVM serving iSCSI + NFSv4.1; one generic NFS server | 02-storage-drivers |
+| A6 | External storage | NetApp ONTAP (AFF HA pair, 9.10.1+) with one SVM. **NVMe/TCP is the default block protocol (confirmed by you)**, iSCSI kept as fallback, NFSv4.1 for capacity. One generic NFS server | 02-storage-drivers |
 | A7 | SDS | Longhorn (bundled) is the primary storage. Portworx is included because you asked for it, on separate disks | 04-portworx, disk map |
 | A8 | Backup | Kasten runs in the Harvester cluster. S3-compatible object storage with Object Lock exists | 05-kasten |
 | A9 | Rancher | Rancher Prime runs on its own 3-node RKE2 cluster, outside Harvester | 06-rancher |

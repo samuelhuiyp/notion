@@ -25,6 +25,10 @@ None of these citations were fetched live while writing; they're based on prior 
 
 | Item | File | What to verify | Where |
 |------|------|----------------|-------|
+| Trident `sanType: nvme` minimum version + RWX block support (live migration) | 02-storage-drivers/netapp-trident/backend-ontap-san-nvme.yaml | Release notes for your Trident version | https://docs.netapp.com/us-en/trident/ |
+| `nvme-cli`, `nvme-tcp` module, native multipath default in the Harvester OS | 02-storage-drivers/host-prereqs/cloudinit-nvme-tcp.yaml | `which nvme`, `cat /sys/module/nvme_core/parameters/multipath` | NetApp ONTAP SAN host config for SUSE: https://docs.netapp.com/us-en/ontap-sanhost/ |
+| Whether `/etc/nvme` persists on the immutable OS (the boot-stage rewrite assumes it may not) | same | Reboot a node, then compare `/etc/nvme/hostnqn` | Harvester / Elemental persistent paths docs |
+| `netapp.ontap` module options (`services`, `application_dicts`, `service_policy`) | 02-storage-drivers/netapp-ontap-setup/playbook-nvme-tcp.yaml | Collection version in use | https://docs.ansible.com/ansible/latest/collections/netapp/ontap/ |
 | `vm-migration-network` setting name and JSON shape | 01-networking/vm-migration-network.yaml | Exists in your release | https://docs.harvesterhci.io/latest/advanced/settings |
 | BlockDevice `spec.provision` / `spec.provisioner` | 00-node-deployment/post-install | Field names changed around v1.5 | `kubectl explain bd.spec` |
 | CloudInit CRD + wicked ifcfg format | 01-networking/host-storage-interfaces | OS base may move to NetworkManager | https://docs.harvesterhci.io/latest/advanced/cloudinitcrd |
@@ -44,7 +48,10 @@ None of these citations were fetched live while writing; they're based on prior 
 - [ ] `scripts/validate.sh` (lint + schema)
 - [ ] `kubectl apply --dry-run=server -k <dir>` for every stage, on a lab cluster of the same version
 - [ ] Jumbo-frame test on every storage VLAN: `ping -M do -s 8972 <peer>`
-- [ ] `multipath -ll` shows NetApp LUNs with 4 paths; `lsblk` shows Longhorn devices **not** under dm-*
+- [ ] `cat /etc/nvme/hostnqn` is **different on every node**
+- [ ] `nvme list-subsys` shows each NetApp namespace with 4 paths (2 optimized, 2 non-optimized) and `iopolicy` round-robin
+- [ ] Live-migrate a VM on `netapp-san-performance` (NVMe) **and** fail one fabric (shut a switch port) during I/O: no guest I/O errors
+- [ ] (iSCSI fallback) `multipath -ll` shows NetApp LUNs with 4 paths; `lsblk` shows Longhorn devices **not** under dm-*
 - [ ] Live-migrate one VM per StorageClass; drain a node with 20+ VMs and time it
 - [ ] Kasten: back up and **restore** a VM to a different namespace (an untested backup isn't a backup)
 - [ ] Pull a node's power cord: VM restarts elsewhere within `vm-force-reset-policy` period + boot time
