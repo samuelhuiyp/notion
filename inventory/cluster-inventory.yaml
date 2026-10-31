@@ -1,0 +1,77 @@
+# -----------------------------------------------------------------------------
+# Single source of truth for the values used across this repo.
+# This is NOT a Kubernetes manifest — it is reference data. If you change a
+# value here, grep the repo and update every manifest that uses it
+# (or template the repo with Kustomize replacements / Helm / ytt later).
+# All values are ASSUMPTIONS — see docs/assumptions.md.
+# -----------------------------------------------------------------------------
+cluster:
+  name: harvester-prod
+  harvesterVersion: "v1.6.x (verify every CRD against the docs for your exact release)"
+  domain: corp.example.com          # avoid .local (conflicts with mDNS)
+  vip: 10.10.10.10
+  vipFqdn: harvester.corp.example.com
+  dns: [10.10.10.53, 10.10.10.54]
+  ntp: [ntp1.corp.example.com, ntp2.corp.example.com]
+  timezone: UTC
+
+nodes:
+  # role: management = control plane + etcd + workloads; worker = workloads only
+  - {name: hv01, mode: create, role: management, mgmtIp: 10.10.10.11, iscsiA: 10.10.21.11, iscsiB: 10.10.22.11, nvmeA: 10.10.25.11, nvmeB: 10.10.26.11, nfs: 10.10.23.11, pxData: 10.10.24.11, zone: rack-a}
+  - {name: hv02, mode: join,   role: management, mgmtIp: 10.10.10.12, iscsiA: 10.10.21.12, iscsiB: 10.10.22.12, nvmeA: 10.10.25.12, nvmeB: 10.10.26.12, nfs: 10.10.23.12, pxData: 10.10.24.12, zone: rack-b}
+  - {name: hv03, mode: join,   role: management, mgmtIp: 10.10.10.13, iscsiA: 10.10.21.13, iscsiB: 10.10.22.13, nvmeA: 10.10.25.13, nvmeB: 10.10.26.13, nfs: 10.10.23.13, pxData: 10.10.24.13, zone: rack-c}
+  - {name: hv04, mode: join,   role: worker,     mgmtIp: 10.10.10.14, iscsiA: 10.10.21.14, iscsiB: 10.10.22.14, nvmeA: 10.10.25.14, nvmeB: 10.10.26.14, nfs: 10.10.23.14, pxData: 10.10.24.14, zone: rack-a}
+  - {name: hv05, mode: join,   role: worker,     mgmtIp: 10.10.10.15, iscsiA: 10.10.21.15, iscsiB: 10.10.22.15, nvmeA: 10.10.25.15, nvmeB: 10.10.26.15, nfs: 10.10.23.15, pxData: 10.10.24.15, zone: rack-b}
+
+hardwarePerNode:
+  cpu: 2x 32-core (64c/128t)
+  memory: 1 TiB
+  nics:
+    eno1/eno2:     {speed: 10G, use: "mgmt (active-backup)"}
+    ens1f0/ens2f0: {speed: 25G, use: "cluster network 'vmnet' (LACP) — VM VLANs + live migration"}
+    ens1f1/ens3f0: {speed: 25G, use: "cluster network 'storage' (LACP, MTU 9000) — Longhorn replication"}
+    ens2f1/ens3f1: {speed: 25G, use: "host bond 'bond-ext' (LACP, MTU 9000) — NVMe/TCP A/B (default), iSCSI A/B (fallback), NFS, Portworx"}
+  disks:
+    boot:     {dev: "/dev/disk/by-id/<BOSS-RAID1>",   size: 480G,  use: Harvester OS}
+    data:     {dev: "/dev/disk/by-id/<nvme0>",        size: 3.84T, use: "Harvester data disk (VM images, default Longhorn disk)"}
+    perf:     {dev: ["<nvme1>", "<nvme2>"],           size: 3.84T, use: "Longhorn disk tag: nvme"}
+    pxPerf:   {dev: ["<nvme3>", "<nvme4>"],           size: 3.84T, use: "Portworx pool (perf)"}
+    capacity: {dev: ["<sdb>", "<sdc>"],               size: 7.68T, use: "Longhorn disk tag: capacity (SATA SSD/QLC)"}
+    pxCap:    {dev: ["<sdd>", "<sde>"],               size: 7.68T, use: "Portworx pool (capacity)"}
+
+vlans:
+  - {id: 10,  name: mgmt,          cidr: 10.10.10.0/24, gw: 10.10.10.1, mtu: 1500, carrier: "mgmt (native/untagged)"}
+  - {id: 20,  name: lh-storage,    cidr: 10.10.20.0/24, gw: null,       mtu: 9000, carrier: "storage cluster network"}
+  - {id: 21,  name: iscsi-a,       cidr: 10.10.21.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 22,  name: iscsi-b,       cidr: 10.10.22.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 23,  name: nfs,           cidr: 10.10.23.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 25,  name: nvme-tcp-a,    cidr: 10.10.25.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 26,  name: nvme-tcp-b,    cidr: 10.10.26.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 24,  name: px-data,       cidr: 10.10.24.0/24, gw: null,       mtu: 9000, carrier: bond-ext}
+  - {id: 30,  name: live-migration, cidr: 10.10.30.0/24, gw: null,      mtu: 9000, carrier: "vmnet cluster network"}
+  - {id: 100, name: vm-prod,       cidr: 10.100.0.0/22, gw: 10.100.0.1, mtu: 1500, carrier: "vmnet cluster network"}
+  - {id: 110, name: vm-dmz,        cidr: 10.110.0.0/24, gw: 10.110.0.1, mtu: 1500, carrier: "vmnet cluster network"}
+  - {id: 120, name: vm-dev,        cidr: 10.120.0.0/23, gw: 10.120.0.1, mtu: 1500, carrier: "vmnet cluster network"}
+
+externalStorage:
+  netapp:
+    model: "AFF HA pair (aff-01 / aff-02), ONTAP 9.10.1+ with NVMe/TCP"
+    clusterMgmt: 10.10.10.199
+    managementLif: 10.10.10.200        # SVM mgmt LIF used by Trident
+    svm: svm_harvester
+    defaultBlockProtocol: nvme-tcp
+    nvmeTcpLifs: [10.10.25.101, 10.10.25.102, 10.10.26.101, 10.10.26.102]
+    iscsiLifs: [10.10.21.101, 10.10.21.102, 10.10.22.101, 10.10.22.102]
+    nfsLif: 10.10.23.100
+  genericNfs:
+    server: 10.10.23.50
+    export: /export/harvester
+  genericIscsi:
+    portal: 10.10.21.150:3260
+  objectStore:
+    endpoint: https://s3.corp.example.com
+    bucket: harvester-k10-backups
+
+rancher:
+  url: https://rancher.corp.example.com
+  runsOn: "separate 3-node RKE2 cluster — NOT on this Harvester cluster"

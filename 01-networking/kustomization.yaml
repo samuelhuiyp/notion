@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Apply order matters on a live cluster: cluster networks -> vlanconfigs -> wait
+# until `kubectl get clusternetwork` shows ready -> NADs/settings.
+resources:
+  - cluster-networks.yaml
+  - vlan-configs.yaml
+  - vm-networks.yaml
+  - storage-network.yaml
+  - vm-migration-network.yaml
+  - host-storage-interfaces/cloudinit-hv01.yaml
+  - host-storage-interfaces/cloudinit-hv02.yaml
+  - host-storage-interfaces/cloudinit-hv03.yaml
+  - host-storage-interfaces/cloudinit-hv04.yaml
+  - host-storage-interfaces/cloudinit-hv05.yaml

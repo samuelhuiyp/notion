@@ -1,0 +1,63 @@
+# -----------------------------------------------------------------------------
+# dm-multipath for external iSCSI LUNs (iSCSI FALLBACK path; NVMe/TCP is the
+# default and uses native NVMe multipath instead — see cloudinit-nvme-tcp.yaml).
+# Harvester ships multipathd DISABLED because it collides with Longhorn: Longhorn
+# v1 exposes every volume as a local iSCSI LUN (vendor "IET", product
+# "VIRTUAL-DISK"); if multipathd claims those, Longhorn volumes fail to attach.
+#
+# Strategy here = deny-by-default: blacklist every device, then allow only
+# known external array LUNs. Local NVMe/SATA, Longhorn and Portworx (/dev/pxd*)
+# devices can therefore never be grabbed.
+#
+# Do NOT lower node.session.timeo.replacement_timeout globally in iscsid.conf:
+# Longhorn's local iSCSI sessions share that setting and would error out during
+# engine restarts. Leave the default (120s); multipath handles path failover.
+#
+# Requires a reboot of each node (one at a time, via maintenance mode).
+# Docs: https://docs.harvesterhci.io/latest/advanced/csidriver  (third-party storage)
+#       https://docs.netapp.com/us-en/trident/trident-use/worker-node-prep.html
+# -----------------------------------------------------------------------------
+apiVersion: node.harvesterhci.io/v1beta1
+kind: CloudInit
+metadata:
+  name: multipath-external-san
+spec:
+  matchSelector:
+    storage.corp.example.com/external-san: "true"   # label set by scripts/label-nodes.sh
+  filename: 96_multipath.yaml
+  contents: |
+    stages:
+      initramfs:
+        - name: "multipath.conf for external SAN"
+          files:
+            - path: /etc/multipath.conf
+              permissions: 420
+              content: |
+                defaults {
+                    user_friendly_names no
+                    find_multipaths     no
+                }
+                blacklist {
+                    device {
+                        vendor  ".*"
+                        product ".*"
+                    }
+                }
+                blacklist_exceptions {
+                    device {
+                        vendor  "NETAPP"
+                        product "LUN.*"
+                    }
+                    # Add other arrays explicitly, e.g.:
+                    # device { vendor "PURE" product "FlashArray" }
+                }
+      network:
+        - name: "enable multipathd + iscsid"
+          systemctl:
+            enable:
+              - multipathd
+              - iscsid
+            start:
+              - multipathd
+              - iscsid
+  paused: false

@@ -1,0 +1,8 @@
+# Rebalances VMs (via live migration) when nodes become unevenly loaded,
+# e.g. after a node returns from maintenance. Available as an addon in newer
+# Harvester releases — VERIFY the addon name/namespace in your version:
+#   kubectl get addons -A
+# kubectl -n kube-system patch addon descheduler --type merge \
+#   --patch-file 07-optimisation/addons/descheduler.patch.yaml
+spec:
+  enabled: true

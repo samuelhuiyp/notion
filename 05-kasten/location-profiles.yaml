@@ -1,0 +1,56 @@
+# -----------------------------------------------------------------------------
+# Kasten location profiles (3-2-1):
+#   s3-immutable : primary off-cluster copy on S3-compatible object storage with
+#                  Object Lock -> ransomware-resistant
+#   nfs-local    : fast secondary copy on the NFS filer (short retention, quick restore)
+# Docs: https://docs.kasten.io/latest/api/profiles.html
+# -----------------------------------------------------------------------------
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Profile
+metadata:
+  name: s3-immutable
+  namespace: kasten-io
+spec:
+  type: Location
+  locationSpec:
+    type: ObjectStore
+    objectStore:
+      objectStoreType: S3
+      name: harvester-k10-backups
+      endpoint: https://s3.corp.example.com
+      region: us-east-1
+      skipSSLVerify: false
+      protectionPeriod: 720h0m0s       # immutability window (30d); bucket must have Object Lock
+    credential:
+      secretType: AwsAccessKey
+      secret:
+        apiVersion: v1
+        kind: secret
+        name: k10-s3-secret
+        namespace: kasten-io
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: k10-nfs-filestore
+  namespace: kasten-io
+spec:
+  storageClassName: nfs-capacity
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Ti
+---
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: Profile
+metadata:
+  name: nfs-local
+  namespace: kasten-io
+spec:
+  type: Location
+  locationSpec:
+    type: FileStore
+    fileStore:
+      claimName: k10-nfs-filestore
+      path: /

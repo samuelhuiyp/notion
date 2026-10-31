@@ -1,0 +1,13 @@
+# -----------------------------------------------------------------------------
+# Longhorn storage network: moves replica sync/rebuild traffic off mgmt.
+# Harvester creates a NAD and attaches it to Longhorn instance-manager pods.
+# - range must hold >= (nodes * 2) + (nodes * disks) IPs; /24 is ample.
+# - Changing this restarts Longhorn pods: ALL VMs must be stopped first.
+#   Set it BEFORE creating any VMs.
+# Docs: https://docs.harvesterhci.io/latest/advanced/storagenetwork
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: storage-network
+value: '{"vlan":20,"clusterNetwork":"storage","range":"10.10.20.0/24","exclude":["10.10.20.1/32","10.10.20.254/32"]}'

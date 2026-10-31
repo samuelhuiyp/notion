@@ -1,0 +1,70 @@
+# -----------------------------------------------------------------------------
+# Longhorn tiers (local HCI storage)
+#   lh-performance : NVMe disks (tag "nvme"),       3 replicas, local replica preferred
+#   lh-capacity    : SATA/QLC disks (tag "capacity"), 2 replicas
+# "migratable: true" is REQUIRED for VM live migration on Longhorn (RWX block).
+# Disk tags are set by scripts/tag-disks.sh. Built-in "harvester-longhorn" is
+# kept (Harvester and VM images depend on it) but no longer the default.
+#   kubectl annotate sc harvester-longhorn storageclass.kubernetes.io/is-default-class=false --overwrite
+# -----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: lh-performance
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+    description: "Tier 1 - NVMe, 3 replicas, for databases / latency-sensitive VMs"
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "3"
+  staleReplicaTimeout: "30"
+  migratable: "true"
+  diskSelector: "nvme"
+  # best-effort keeps one replica on the VM's node -> lower read latency;
+  # costs a background rebuild after each live migration
+  dataLocality: "best-effort"
+  replicaAutoBalance: "best-effort"
+  dataEngine: "v1"
+  unmapMarkSnapChainRemoved: "enabled"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: lh-capacity
+  annotations:
+    description: "Tier 2 - SATA/QLC, 2 replicas, for file servers / bulk / dev VMs. Must be backed up by Kasten."
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "2"           # trade-off: tolerates 1 node/disk loss, saves 33% raw capacity vs 3
+  staleReplicaTimeout: "30"
+  migratable: "true"
+  diskSelector: "capacity"
+  dataLocality: "disabled"
+  replicaAutoBalance: "best-effort"
+  dataEngine: "v1"
+  unmapMarkSnapChainRemoved: "enabled"
+---
+# Retain variant for data you must never lose on accidental PVC delete.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: lh-performance-retain
+  annotations:
+    description: "Tier 1 with reclaimPolicy Retain - critical DB data disks"
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "3"
+  staleReplicaTimeout: "30"
+  migratable: "true"
+  diskSelector: "nvme"
+  dataLocality: "best-effort"
+  dataEngine: "v1"

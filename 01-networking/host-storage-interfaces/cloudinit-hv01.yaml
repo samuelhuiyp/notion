@@ -1,0 +1,103 @@
+# -----------------------------------------------------------------------------
+# Host-level interfaces for EXTERNAL storage (NVMe/TCP A/B, iSCSI A/B, NFS, Portworx) on hv01
+# Why host-level: Harvester cluster networks only give VMs/pods L2 access; CSI
+# node plugins (Trident, NFS CSI, Portworx) run in the host network namespace and
+# need a host IP on the storage VLANs.
+#
+# Mechanism: Harvester CloudInit CRD -> file in /oem -> applied at boot (requires reboot).
+# Format: wicked ifcfg (SLE Micro 5.x based Harvester). If your Harvester release
+# is based on SL Micro 6 / NetworkManager, convert to keyfiles — VERIFY before use.
+# Docs: https://docs.harvesterhci.io/latest/advanced/cloudinitcrd
+#
+# Design: ens2f1+ens3f1 LACP bond (physical redundancy) + per-protocol fabric
+# VLAN pairs on separate subnets, so native NVMe multipath (VLAN 25/26, default)
+# and dm-multipath for iSCSI (VLAN 21/22, fallback) each see >= 2 paths.
+# -----------------------------------------------------------------------------
+apiVersion: node.harvesterhci.io/v1beta1
+kind: CloudInit
+metadata:
+  name: ext-storage-net-hv01
+spec:
+  matchSelector:
+    kubernetes.io/hostname: hv01
+  filename: 95_ext_storage_net.yaml
+  contents: |
+    stages:
+      initramfs:
+        - name: "external storage bond and VLANs"
+          files:
+            - path: /etc/sysconfig/network/ifcfg-ens2f1
+              permissions: 384
+              content: |
+                STARTMODE='hotplug'
+                BOOTPROTO='none'
+            - path: /etc/sysconfig/network/ifcfg-ens3f1
+              permissions: 384
+              content: |
+                STARTMODE='hotplug'
+                BOOTPROTO='none'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='none'
+                BONDING_MASTER='yes'
+                BONDING_SLAVE_0='ens2f1'
+                BONDING_SLAVE_1='ens3f1'
+                BONDING_MODULE_OPTS='mode=802.3ad miimon=100 lacp_rate=fast xmit_hash_policy=layer3+4'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.21
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='21'
+                IPADDR='10.10.21.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.22
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='22'
+                IPADDR='10.10.22.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.23
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='23'
+                IPADDR='10.10.23.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.24
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='24'
+                IPADDR='10.10.24.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.25
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='25'
+                IPADDR='10.10.25.11/24'
+                MTU='9000'
+            - path: /etc/sysconfig/network/ifcfg-bond-ext.26
+              permissions: 384
+              content: |
+                STARTMODE='onboot'
+                BOOTPROTO='static'
+                ETHERDEVICE='bond-ext'
+                VLAN_ID='26'
+                IPADDR='10.10.26.11/24'
+                MTU='9000'
+  paused: false

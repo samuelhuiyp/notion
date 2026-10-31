@@ -1,0 +1,55 @@
+# -----------------------------------------------------------------------------
+# GENERAL VM profile (app servers, utility VMs). Example only.
+# - Shared CPUs: Harvester's overcommit webhook derives requests from limits
+#   (08-overcommit), so set only what the guest should see as limits.
+# - Capacity tier disk, evictable by live migration.
+# -----------------------------------------------------------------------------
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: app01
+  namespace: vm-prod
+  annotations:
+    harvesterhci.io/reservedMemory: 256Mi
+spec:
+  runStrategy: RerunOnFailure
+  template:
+    metadata:
+      labels:
+        harvesterhci.io/vmName: app01
+    spec:
+      evictionStrategy: LiveMigrate
+      domain:
+        machine:
+          type: q35
+        cpu:
+          sockets: 1
+          cores: 4
+          threads: 1
+        memory:
+          guest: 8Gi
+        resources:
+          limits:
+            cpu: "4"
+            memory: 8Gi
+        features:
+          acpi: {}
+        devices:
+          networkInterfaceMultiqueue: true
+          disks:
+            - name: rootdisk
+              bootOrder: 1
+              disk:
+                bus: virtio
+          interfaces:
+            - name: prod
+              model: virtio
+              bridge: {}
+      networks:
+        - name: prod
+          multus:
+            networkName: vm-networks/vlan100-prod
+      volumes:
+        - name: rootdisk
+          persistentVolumeClaim:
+            claimName: app01-rootdisk       # from image harvester-public/ubuntu-2404-capacity

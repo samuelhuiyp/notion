@@ -1,0 +1,41 @@
+# -----------------------------------------------------------------------------
+# NetApp ONTAP SAN over NVMe/TCP -> DEFAULT external PERFORMANCE tier.
+# Trident creates one NVMe subsystem per node and maps namespaces to the
+# node's host NQN automatically, so no manual host/subsystem config on ONTAP.
+# Raw block volumes; RWX block is what Harvester live migration needs —
+# PROVE live migration on this backend before production (see review notes).
+#
+# Requirements (verify against current docs):
+#   - ONTAP 9.10.1+ with NVMe/TCP, NVMe service enabled on the SVM
+#     (02-storage-drivers/netapp-ontap-setup/)
+#   - Trident release that supports sanType: nvme on ontap-san (23.10+ as I
+#     recall; check the release notes for your version)
+#   - Host prep: host-prereqs/cloudinit-nvme-tcp.yaml
+# Docs: https://docs.netapp.com/us-en/trident/trident-use/ontap-san-examples.html
+# -----------------------------------------------------------------------------
+apiVersion: trident.netapp.io/v1
+kind: TridentBackendConfig
+metadata:
+  name: ontap-san-nvme-perf
+  namespace: trident
+spec:
+  version: 1
+  storageDriverName: ontap-san
+  backendName: ontap-san-nvme-perf
+  managementLIF: 10.10.10.200    # SVM management LIF (not cluster mgmt)
+  svm: svm_harvester
+  sanType: nvme                  # NVMe/TCP; no CHAP (not applicable to NVMe in Trident)
+  credentials:
+    name: backend-ontap-secret
+  limitVolumeSize: 8Ti
+  defaults:
+    spaceReserve: none           # thin
+    spaceAllocation: "true"      # deallocate/UNMAP -> space reclaim from guests
+    snapshotPolicy: none         # snapshots driven by K8s/Kasten, not ONTAP schedules
+    snapshotReserve: "0"
+    encryption: "false"          # set "true" if NVE/NAE licensed
+    # adaptiveQosPolicy: aqos-harvester-perf   # optional, created in netapp-ontap-setup
+  labels:
+    tier: performance
+    protocol: nvme
+    pool: san-nvme               # unique label -> StorageClass selector targets ONLY this backend

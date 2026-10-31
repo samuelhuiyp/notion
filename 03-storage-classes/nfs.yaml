@@ -1,0 +1,29 @@
+# -----------------------------------------------------------------------------
+# Generic NFS (csi-driver-nfs) — capacity / archive tier.
+# One subdirectory per PVC under the export. No array-side snapshots:
+# csi-driver-nfs snapshots are tarball copies -> slow for large volumes.
+# -----------------------------------------------------------------------------
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-capacity
+  annotations:
+    description: "Generic NFS export - Kasten FileStore, ISO library, shared files"
+provisioner: nfs.csi.k8s.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain             # deleting a PVC must not rm -rf data on the filer
+volumeBindingMode: Immediate
+parameters:
+  server: 10.10.23.50
+  share: /export/harvester
+  subDir: ${pvc.metadata.namespace}/${pvc.metadata.name}
+  mountPermissions: "0770"
+mountOptions:
+  - nfsvers=4.1
+  - hard
+  - nconnect=8
+  - rsize=1048576
+  - wsize=1048576
+  - timeo=600
+  - retrans=2
+  - noatime

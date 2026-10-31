@@ -1,0 +1,32 @@
+# -----------------------------------------------------------------------------
+# Example VM images pinned to a tier. Not in the kustomization (image URLs are
+# environment specific). Root disks created from a Longhorn image inherit the
+# parameters of the StorageClass named in harvesterhci.io/storageClassName.
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineImage
+metadata:
+  name: sles15-sp6-perf
+  namespace: harvester-public     # shared, readable by all namespaces
+  annotations:
+    harvesterhci.io/storageClassName: lh-performance
+spec:
+  displayName: SLES 15 SP6 (performance tier)
+  sourceType: download
+  url: https://images.corp.example.com/sles15-sp6-minimal-cloud.qcow2
+  checksum: "REPLACE_WITH_SHA512"
+  retry: 3
+---
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineImage
+metadata:
+  name: ubuntu-2404-capacity
+  namespace: harvester-public
+  annotations:
+    harvesterhci.io/storageClassName: lh-capacity
+spec:
+  displayName: Ubuntu 24.04 (capacity tier)
+  sourceType: download
+  url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+  checksum: "REPLACE_WITH_SHA512"
+  retry: 3

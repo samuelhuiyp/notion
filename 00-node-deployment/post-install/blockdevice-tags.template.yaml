@@ -1,0 +1,24 @@
+# -----------------------------------------------------------------------------
+# TEMPLATE — do not `kubectl apply` as-is. BlockDevice objects already exist
+# (created by node-disk-manager) and are named by hash. Use scripts/tag-disks.sh,
+# which finds each disk by node + /dev/disk/by-id and patches it with this shape.
+#
+# Field names follow Harvester v1.5+ (spec.provision / spec.provisioner).
+# Older releases used spec.fileSystem.provisioned — check `kubectl explain bd.spec`.
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: BlockDevice
+metadata:
+  name: REPLACE-bd-hash               # kubectl -n longhorn-system get bd -o wide
+  namespace: longhorn-system
+spec:
+  nodeName: hv01
+  devPath: /dev/disk/by-id/REPLACE-nvme1
+  provision: true                     # hand the disk to Longhorn
+  provisioner:
+    longhorn:
+      engineVersion: LonghornV1
+  fileSystem:
+    forceFormatted: true              # wipes the disk — double check devPath
+  tags:
+    - nvme                            # matched by StorageClass diskSelector "nvme"

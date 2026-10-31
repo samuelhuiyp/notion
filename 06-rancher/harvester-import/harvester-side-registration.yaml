@@ -1,0 +1,8 @@
+# Step 2 — apply on the HARVESTER cluster with the URL from step 1.
+# Harvester's API must be able to reach rancher.corp.example.com:443 and trust its CA
+# (add the corporate CA to the Harvester "additional-ca" setting, see 07-optimisation).
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: cluster-registration-url
+value: "https://rancher.corp.example.com/v3/import/REPLACE_WITH_TOKEN_c-m-xxxxxxxx.yaml"

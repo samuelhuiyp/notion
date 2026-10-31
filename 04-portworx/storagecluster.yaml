@@ -1,0 +1,69 @@
+# -----------------------------------------------------------------------------
+# Portworx Enterprise StorageCluster on Harvester.
+# BEFORE USE: confirm Portworx officially supports your Harvester (SUSE
+# Virtualization) release + kernel. Harvester's OS is immutable; Portworx needs
+# a px-fuse module for that exact kernel. Generate the authoritative spec with
+# PX-Central and diff it against this file.
+# Docs: https://docs.portworx.com/portworx-enterprise/reference/crd/storage-cluster
+#
+# Disks: Portworx consumes RAW disks that Longhorn does NOT own (see
+# inventory/cluster-inventory.yaml: pxPerf + pxCap). Never list a Longhorn disk here.
+# -----------------------------------------------------------------------------
+apiVersion: core.libopenstorage.org/v1
+kind: StorageCluster
+metadata:
+  name: px-harvester
+  namespace: portworx
+  annotations:
+    portworx.io/install-source: "operator"
+spec:
+  image: portworx/oci-monitor:3.2.0     # PIN to a version validated for your Harvester release
+  imagePullPolicy: IfNotPresent
+  kvdb:
+    internal: true                      # built-in KVDB on 3 nodes
+  storage:
+    useAll: false
+    useAllWithPartitions: false
+    forceUseDisks: false
+    devices:                            # by-id paths, identical model per node
+      - /dev/disk/by-id/REPLACE-nvme3
+      - /dev/disk/by-id/REPLACE-nvme4
+      - /dev/disk/by-id/REPLACE-sdd
+      - /dev/disk/by-id/REPLACE-sde
+    journalDevice: auto
+    kvdbDevice: /dev/disk/by-id/REPLACE-kvdb-partition-or-small-ssd
+  network:
+    dataInterface: bond-ext.24          # PX replication on VLAN 24 (host interface from 01-networking)
+    mgmtInterface: mgmt-br              # Harvester mgmt bridge
+  placement:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: px/enabled
+                operator: In
+                values: ["true"]
+  secretsProvider: k8s
+  csi:
+    enabled: true
+  stork:
+    enabled: true                       # scheduler extender: places VMs near PX replicas
+    args:
+      webhook-controller: "true"
+  autopilot:
+    enabled: true                       # auto-expand pools/volumes by rule
+  monitoring:
+    telemetry:
+      enabled: false                    # enable if outbound to Pure1 is allowed
+    prometheus:
+      enabled: false                    # use Harvester's rancher-monitoring instead
+      exportMetrics: true
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  deleteStrategy:
+    type: Uninstall                     # NOT UninstallAndWipe — avoid accidental data loss
+  env:
+    - name: PX_HTTP_PROXY
+      value: ""

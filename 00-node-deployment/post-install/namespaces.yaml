@@ -1,0 +1,40 @@
+# Workload namespaces. Separate namespaces = separate quotas (08-overcommit),
+# separate Kasten policies (05-kasten) and separate RBAC/Rancher projects.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vm-networks          # holds shared VM NetworkAttachmentDefinitions
+  labels:
+    purpose: networking
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vm-prod
+  labels:
+    environment: production
+    backup-tier: gold
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vm-dmz
+  labels:
+    environment: production
+    backup-tier: gold
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vm-dev
+  labels:
+    environment: development
+    backup-tier: bronze
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rke2-guests          # VMs for Rancher-provisioned guest Kubernetes clusters
+  labels:
+    environment: production
+    backup-tier: silver

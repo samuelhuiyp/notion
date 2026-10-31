@@ -1,0 +1,110 @@
+# -----------------------------------------------------------------------------
+# PERFORMANCE VM profile (e.g. database). Example only — copy and adapt.
+# - Dedicated (pinned) CPUs + emulator thread isolation -> needs CPU Manager on the node
+#   (see scripts/label-nodes.sh). Pinned VMs are excluded from CPU overcommit.
+# - requests == limits (Guaranteed QoS) — never OOM-killed before Burstable pods.
+# - virtio everywhere, multiqueue, dedicated IO thread for the data disk.
+# - host-model CPU: near-native features but still live-migratable between
+#   identical-generation hosts (host-passthrough would block migration).
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db01-data
+  namespace: vm-prod
+spec:
+  storageClassName: lh-performance-retain
+  volumeMode: Block
+  accessModes: ["ReadWriteMany"]   # RWX block = live migration
+  resources:
+    requests:
+      storage: 500Gi
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: db01
+  namespace: vm-prod
+  labels:
+    app.corp.example.com/tier: database
+  annotations:
+    harvesterhci.io/reservedMemory: 512Mi   # memory for QEMU overhead, not visible to the guest
+    k10.kasten.io/freezeVM: "true"          # fsfreeze via guest agent during Kasten backup
+spec:
+  runStrategy: RerunOnFailure
+  template:
+    metadata:
+      labels:
+        harvesterhci.io/vmName: db01
+        app.corp.example.com/tier: database
+    spec:
+      evictionStrategy: LiveMigrate
+      terminationGracePeriodSeconds: 180
+      nodeSelector:
+        cpumanager: "true"                  # label Harvester sets when CPU Manager is enabled
+      affinity:
+        podAntiAffinity:                    # keep db01/db02 replicas on different hosts
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.corp.example.com/tier: database
+              topologyKey: kubernetes.io/hostname
+      domain:
+        machine:
+          type: q35
+        cpu:
+          sockets: 1
+          cores: 8
+          threads: 1
+          model: host-model
+          dedicatedCpuPlacement: true
+          isolateEmulatorThread: true
+        memory:
+          guest: 32Gi
+        resources:
+          requests:
+            cpu: "8"
+            memory: 32Gi
+          limits:
+            cpu: "8"
+            memory: 32Gi
+        ioThreadsPolicy: auto
+        features:
+          acpi: {}
+        devices:
+          blockMultiQueue: true
+          networkInterfaceMultiqueue: true
+          disks:
+            - name: rootdisk
+              bootOrder: 1
+              disk:
+                bus: virtio
+            - name: data
+              dedicatedIOThread: true
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: prod
+              model: virtio
+              bridge: {}
+      networks:
+        - name: prod
+          multus:
+            networkName: vm-networks/vlan100-prod
+      volumes:
+        - name: rootdisk
+          persistentVolumeClaim:
+            claimName: db01-rootdisk        # create from VM image harvester-public/sles15-sp6-perf
+        - name: data
+          persistentVolumeClaim:
+            claimName: db01-data
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              packages: [qemu-guest-agent]
+              runcmd:
+                - systemctl enable --now qemu-guest-agent

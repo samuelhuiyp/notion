@@ -1,0 +1,49 @@
+# -----------------------------------------------------------------------------
+# Generic iSCSI (array WITHOUT a CSI driver) — static provisioning example.
+# Prefer the array vendor's CSI driver (Trident for NetApp, Pure CSO, Dell CSM,
+# HPE CSI...) — static PVs have no snapshots, clones, expansion or Kasten
+# CSI snapshot support. Use this only for a few legacy LUNs (e.g. a VM
+# migrated from VMware with an RDM).
+# Not part of the kustomization: copy, fill in, apply per LUN.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: legacy-lun-app01-data
+  labels:
+    storage.corp.example.com/source: static-iscsi
+spec:
+  capacity:
+    storage: 500Gi
+  volumeMode: Block              # raw block -> attach to VM as a virtio disk
+  accessModes:
+    - ReadWriteMany              # RWX block is required for live migration (array must allow multi-initiator)
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""           # static, not dynamically provisioned
+  iscsi:
+    targetPortal: 10.10.21.150:3260
+    portals:
+      - 10.10.22.150:3260        # second fabric -> multipath
+    iqn: iqn.2005-10.com.example:array01.target01
+    lun: 12
+    fsType: ""                   # raw block, no filesystem
+    readOnly: false
+    chapAuthDiscovery: true
+    chapAuthSession: true
+    secretRef:
+      name: iscsi-chap-legacy    # Secret type kubernetes.io/iscsi-chap in the PVC namespace
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app01-data
+  namespace: vm-prod
+spec:
+  volumeMode: Block
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: legacy-lun-app01-data
+  resources:
+    requests:
+      storage: 500Gi

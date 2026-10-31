@@ -1,0 +1,78 @@
+# -----------------------------------------------------------------------------
+# Harvester platform settings (cluster-scoped harvesterhci.io Setting objects).
+# `value` is always a string; JSON settings are JSON-in-a-string.
+# Docs: https://docs.harvesterhci.io/latest/advanced/settings
+# -----------------------------------------------------------------------------
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: ntp-servers
+value: '{"ntpServers":["ntp1.corp.example.com","ntp2.corp.example.com"]}'
+---
+# Auto-restart VMs elsewhere if their node is unreachable for 5 min.
+# Lower = faster HA but more risk of false positives on a flapping link.
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: vm-force-reset-policy
+value: '{"enable":true,"period":300}'
+---
+# Give guests time to shut down cleanly (databases!) before being killed.
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: default-vm-termination-grace-period-seconds
+value: "120"
+---
+# Rotate RKE2 certs automatically 60 days before expiry.
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: auto-rotate-rke2-certs
+value: '{"enable":true,"expiringInDay":60}'
+---
+# Upgrades: preload images one node at a time (less registry/disk pressure);
+# do not auto-restore VM state — operators bring VMs back deliberately.
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: upgrade-config
+value: '{"imagePreloadOption":{"strategy":{"type":"sequential"}},"restoreVM":false}'
+---
+# Native Harvester backup target (independent of Kasten): last-resort VM backups
+# to NFS. Different filer path from the Kasten FileStore.
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: backup-target
+value: '{"type":"nfs","endpoint":"nfs://10.10.23.50:/export/harvester-native-backup"}'
+---
+# Shorter-lived kubeconfig tokens downloaded from the UI (12h).
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: kubeconfig-default-token-ttl-minutes
+value: "720"
+---
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: log-level
+value: "info"
+---
+# Trust the corporate CA (Rancher, S3, registry, image server).
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: additional-ca
+value: |
+  -----BEGIN CERTIFICATE-----
+  REPLACE_WITH_CORPORATE_ROOT_CA
+  -----END CERTIFICATE-----
+---
+# Larger support bundle timeout for a 5+ node cluster.
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: support-bundle-timeout
+value: "30"

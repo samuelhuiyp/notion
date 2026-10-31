@@ -1,0 +1,70 @@
+# -----------------------------------------------------------------------------
+# NVMe/TCP host preparation for external NetApp ONTAP namespaces (Trident
+# ontap-san, sanType: nvme). This is the DEFAULT external block protocol.
+#
+# What it does on each node (applied at boot, requires a rolling reboot):
+#  1. Loads nvme-tcp / nvme-fabrics at every boot.
+#  2. Keeps NATIVE NVMe multipath on (nvme_core multipath=Y). NVMe paths are
+#     handled by the kernel with ANA, NOT by dm-multipath. multipathd (iSCSI
+#     fallback, cloudinit-multipath.yaml) ignores NVMe devices by design.
+#  3. Sets iopolicy=round-robin for ONTAP subsystems (NetApp host config
+#     guidance), so I/O spreads over all ANA-optimized paths instead of one.
+#  4. Writes a deterministic, unique host NQN + host ID from the server's DMI
+#     UUID. Trident maps namespaces to nodes BY HOST NQN: two nodes with the same
+#     NQN would see each other's volumes = data corruption risk. OS images that
+#     ship a baked-in /etc/nvme/hostnqn are a known cause of duplicates.
+#
+# Do NOT change a node's host NQN after Trident has published volumes to it.
+# NVMe/TCP has no CHAP equivalent here: isolation relies on the non-routed
+# VLANs 25/26 + per-host subsystem mapping done by Trident.
+#
+# VERIFY on one node before rollout:
+#   cat /sys/module/nvme_core/parameters/multipath   -> Y
+#   which nvme && nvme version                         (nvme-cli present in the Harvester OS)
+#   cat /etc/nvme/hostnqn                              (unique across all nodes)
+# Docs (unverified links, check for your SLE Micro / ONTAP versions):
+#   https://docs.netapp.com/us-en/ontap-sanhost/  (NVMe-oF host config for SUSE)
+#   https://docs.netapp.com/us-en/trident/trident-use/worker-node-prep.html
+# -----------------------------------------------------------------------------
+apiVersion: node.harvesterhci.io/v1beta1
+kind: CloudInit
+metadata:
+  name: nvme-tcp-external-san
+spec:
+  matchSelector:
+    storage.corp.example.com/external-san: "true"   # label set by scripts/label-nodes.sh
+  filename: 96_nvme_tcp.yaml
+  contents: |
+    stages:
+      initramfs:
+        - name: "NVMe/TCP modules, native multipath, ONTAP iopolicy"
+          files:
+            - path: /etc/modules-load.d/nvme-tcp.conf
+              permissions: 420
+              content: |
+                nvme-fabrics
+                nvme-tcp
+            - path: /etc/modprobe.d/90-nvme-core-multipath.conf
+              permissions: 420
+              content: |
+                options nvme_core multipath=Y
+            - path: /etc/udev/rules.d/71-nvmf-netapp-iopolicy.rules
+              permissions: 420
+              content: |
+                ACTION=="add|change", SUBSYSTEM=="nvme-subsystem", ATTR{subsystype}=="nvm", ATTR{model}=="NetApp ONTAP Controller", ATTR{iopolicy}="round-robin"
+      boot:
+        - name: "unique host NQN from DMI UUID"
+          commands:
+            - |
+              set -e
+              mkdir -p /etc/nvme
+              uuid=$(tr 'A-Z' 'a-z' < /sys/class/dmi/id/product_uuid)
+              case "$uuid" in
+                ""|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)
+                  echo "nvme-tcp: invalid DMI UUID '$uuid' - fix BIOS before using NVMe/TCP" >&2
+                  exit 1 ;;
+              esac
+              echo "nqn.2014-08.org.nvmexpress:uuid:${uuid}" > /etc/nvme/hostnqn
+              echo "${uuid}" > /etc/nvme/hostid
+            - modprobe nvme-tcp
+  paused: false

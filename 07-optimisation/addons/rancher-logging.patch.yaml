@@ -1,0 +1,5 @@
+# kubectl -n cattle-logging-system patch addon rancher-logging --type merge \
+#   --patch-file 07-optimisation/addons/rancher-logging.patch.yaml
+# Then create a ClusterOutput/ClusterFlow to your SIEM (Splunk/Elastic/Loki).
+spec:
+  enabled: true

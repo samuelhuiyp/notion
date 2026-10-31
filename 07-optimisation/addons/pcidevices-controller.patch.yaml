@@ -1,0 +1,5 @@
+# GPU / NIC passthrough and SR-IOV. Requires VT-d/AMD-Vi + SR-IOV enabled in BIOS.
+# kubectl -n harvester-system patch addon pcidevices-controller --type merge \
+#   --patch-file 07-optimisation/addons/pcidevices-controller.patch.yaml
+spec:
+  enabled: true

@@ -1,0 +1,66 @@
+# -----------------------------------------------------------------------------
+# Veeam Kasten (K10) on the Harvester cluster — Helm values
+#   helm repo add kasten https://charts.kasten.io/
+#   kubectl create ns kasten-io
+#   helm upgrade --install k10 kasten/k10 -n kasten-io --version <pin> -f 05-kasten/helm-values.yaml
+# Kasten must run IN the Harvester cluster to protect its VMs (it snapshots the
+# VM's PVCs + VirtualMachine objects). Confirm your Kasten version lists your
+# Harvester / SUSE Virtualization release as supported.
+# Pre-flight: curl -s https://docs.kasten.io/tools/k10_primer.sh | bash
+# Docs: https://docs.kasten.io/latest/install/advanced.html
+# -----------------------------------------------------------------------------
+eula:
+  accept: true                    # accepting the EULA is a decision for your org — review it
+  company: "Example Corp"
+  email: "platform-team@corp.example.com"
+clusterName: harvester-prod
+auth:
+  tokenAuth:
+    enabled: false
+  oidcAuth:
+    enabled: true                 # SSO via your IdP (Keycloak/Entra ID/etc.)
+    providerURL: https://idp.corp.example.com/realms/corp
+    redirectURL: https://k10.corp.example.com
+    scopes: "groups profile email"
+    prompt: select_account
+    clientID: k10
+    clientSecretName: k10-oidc-client      # Secret with key client-secret, created out-of-band
+    usernameClaim: email
+    groupClaim: groups
+  k10AdminGroups:
+    - platform-admins
+global:
+  persistence:
+    enabled: true
+    storageClass: lh-capacity     # catalog/metadata — not on the tier it protects alone; also exported via DR policy
+    size: 20Gi
+    catalog:
+      size: 50Gi
+ingress:
+  create: true
+  class: nginx                    # Harvester's rke2-ingress-nginx
+  host: k10.corp.example.com
+  urlPath: k10
+  tls:
+    enabled: true
+    secretName: k10-tls
+prometheus:
+  server:
+    enabled: true
+grafana:
+  enabled: false                  # dashboards via rancher-monitoring Grafana instead
+# Do not try to back up Harvester/K8s system namespaces as "apps".
+excludedApps:
+  - kube-system
+  - kube-public
+  - kube-node-lease
+  - harvester-system
+  - longhorn-system
+  - cattle-system
+  - cattle-fleet-system
+  - cattle-monitoring-system
+  - cattle-logging-system
+  - fleet-local
+  - local
+  - trident
+  - portworx

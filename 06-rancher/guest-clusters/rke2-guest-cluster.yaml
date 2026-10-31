@@ -1,0 +1,56 @@
+# -----------------------------------------------------------------------------
+# RKE2 guest cluster on Harvester, provisioned by Rancher. Apply on RANCHER.
+# - harvester-cloud-provider : LoadBalancer services backed by Harvester
+# - harvester-csi-driver     : guest PVCs become Harvester volumes (hot-plugged)
+# - 3 CP/etcd + 3 workers; machine pools get spread across Harvester nodes by
+#   the default VM anti-affinity Rancher applies (verify in your version).
+# -----------------------------------------------------------------------------
+apiVersion: provisioning.cattle.io/v1
+kind: Cluster
+metadata:
+  name: rke2-prod-apps
+  namespace: fleet-default
+spec:
+  kubernetesVersion: v1.31.9+rke2r1          # PIN to a version supported by your Rancher
+  cloudCredentialSecretName: cattle-global-data:cc-harvester-prod
+  rkeConfig:
+    chartValues:
+      harvester-cloud-provider:
+        clusterName: rke2-prod-apps
+        cloudConfigPath: /var/lib/rancher/rke2/etc/config-files/cloud-provider-config
+      rke2-calico: {}
+    machineGlobalConfig:
+      cni: calico
+      disable-kube-proxy: false
+      etcd-expose-metrics: false
+    machineSelectorConfig:
+      - config:
+          cloud-provider-name: harvester
+          protect-kernel-defaults: false
+    etcd:
+      snapshotScheduleCron: "0 */6 * * *"
+      snapshotRetention: 12
+    upgradeStrategy:
+      controlPlaneConcurrency: "1"
+      workerConcurrency: "1"
+      controlPlaneDrainOptions:
+        enabled: true
+        deleteEmptyDirData: true
+      workerDrainOptions:
+        enabled: true
+        deleteEmptyDirData: true
+    machinePools:
+      - name: cp-etcd
+        quantity: 3
+        etcdRole: true
+        controlPlaneRole: true
+        workerRole: false
+        machineConfigRef:
+          kind: HarvesterConfig
+          name: rke2-prod-cp
+      - name: workers
+        quantity: 3
+        workerRole: true
+        machineConfigRef:
+          kind: HarvesterConfig
+          name: rke2-prod-worker
