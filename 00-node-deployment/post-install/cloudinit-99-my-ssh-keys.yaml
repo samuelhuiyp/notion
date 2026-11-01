@@ -1,0 +1,15 @@
+apiVersion: node.harvesterhci.io/v1beta1
+kind: CloudInit
+metadata:
+  name: my-ssh-keys
+spec:
+  matchSelector:
+    harvesterhci.io/managed: "true"
+  filename: 99-my-ssh-keys
+  contents: |
+    stages:
+      network:
+        - name: "add my ssh keys"
+          authorized_keys:
+            rancher:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDHmlwN1t84p4K8bmPBOloR46mKEaPYicPuvIcBHzud+Ac0aeapzjQtwguno+RiXh4zz+dky6UkMB8WMvbPZwDcAXb+rt8QOfF9IX9R2aImQpd0wVHL1/qaQj3dETI1Oh0lyfYM+GMbgfpqsmsuCzNVh30QbgkzxhR6hQOXNMrvOrvf98Popyeg/tlviR5EsYu/iLg07qfSqaICiZku/FQ6z6aQHoRjqtLJmywinfB5xr6WUDaz6CUiay538t8uZx/H75VNuvhPJkOc/WeEAn8QCTMFkdFWTgquZCVErnpO9iBXobrIg9Apom3PRB6y5RiBHd/W8ZwUZ1NaZLPVxxMH0+qsf3G5sx0deRxuL2zUHSl2raI3vroaLeqA/EiJ/QC5uB0PFr+rmPvhAabagslT1bDLG10LnOMeokvyIVKFoXZ6JOkKx7NsLbIAQKTYSDMq1ijLIuIpLvs7OG9H3ZBCCNNO0x8kjOSJ+qlIlcw4gKHZ9toQpiQazotWLi4zONgBBsXrnJTtLLLhJWt8rJ/MBTpHN2enIBziPLw3SM1JsnS0f8BiiDopJlr5jGiAF3iKFS3PFw33zJhpuaeHiSx1vKqOcRPIKd5PY3bKtG8Kfonrqh6+4+zEP9B2s4pNCAMHp9MF2b8u2JzWg+Z/zYL5bnIqPWLh7S4GA/++Zn2nEQ== shui@SAM-DESKTOP-02
