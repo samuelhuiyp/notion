@@ -1,0 +1,22 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-coredns
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    zoneFiles:
+    - filename: static-hosts.conf
+      domain: ct.local
+      contents: |
+        rancher.ct.local:53 kasten.ct.local:53 {
+          errors
+          hosts {
+            192.168.1.60 rancher.ct.local
+            192.168.1.60 kasten.ct.local
+          }
+          cache 30
+        }
+    extraConfig:
+      import:
+        parameters: /etc/coredns/static-hosts.conf
