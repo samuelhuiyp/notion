@@ -1,0 +1,42 @@
+# -----------------------------------------------------------------------------
+# Description:
+#   Updates two Harvester cluster settings: the guest memory overhead ratio
+#   (1.1) and the overcommit configuration (CPU 300%, Memory 100%, Storage 150%).
+#
+# Type:
+#   Cluster settings (harvesterhci.io/v1beta1 Setting)
+#
+# Target:
+#   The Harvester cluster itself (kubeconfig of Harvester, NOT Rancher local
+#   or a guest cluster).
+#
+# Usage:
+#   kubectl apply -f harvester-settings-overcommit.yaml
+#
+# Result:
+#   Both Setting objects have .value set to the values below.
+#
+# Verify:
+#   kubectl get settings.harvesterhci.io additional-guest-memory-overhead-ratio overcommit-config -o yaml
+#
+# Notes / assumptions:
+#   - Setting values are always strings; overcommit-config is a JSON string.
+#   - Values are percentages (300 = 300%). Memory 100 = no memory overcommit.
+#   - Changes apply to VMs on their next start/restart, not running VMs
+#     (unverified for your version - check the Harvester docs).
+#   - Existing Setting objects: kubectl apply will set .value and keep the rest.
+# -----------------------------------------------------------------------------
+---
+# Guest memory overhead ratio (default is 1.5)
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: additional-guest-memory-overhead-ratio
+value: "1.1"
+---
+# Overcommit config (defaults: cpu 1600, memory 150, storage 200)
+apiVersion: harvesterhci.io/v1beta1
+kind: Setting
+metadata:
+  name: overcommit-config
+value: '{"cpu":300,"memory":100,"storage":150}'
