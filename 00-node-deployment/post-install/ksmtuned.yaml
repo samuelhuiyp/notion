@@ -1,0 +1,17 @@
+apiVersion: node.harvesterhci.io/v1beta1   # unverified, check against your cluster
+kind: Ksmtuned
+metadata:
+  name: test-node01
+spec:
+  run: run
+  mode: standard
+  thresCoef: 85
+---
+apiVersion: node.harvesterhci.io/v1beta1
+kind: Ksmtuned
+metadata:
+  name: test-node02
+spec:
+  run: run
+  mode: standard
+  thresCoef: 85
