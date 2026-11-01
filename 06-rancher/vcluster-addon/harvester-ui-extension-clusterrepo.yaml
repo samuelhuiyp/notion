@@ -1,0 +1,41 @@
+# -----------------------------------------------------------------------------
+# Description:
+#   Registers the Harvester UI extension Git repository as a Rancher catalog
+#   repo, so the "Harvester" extension appears under Rancher > Extensions and
+#   can be installed from there.
+#
+# Type:
+#   Rancher catalog / app repo (catalog.cattle.io/v1 ClusterRepo)
+#
+# Target:
+#   The Rancher management ("local") cluster that runs inside the Rancher
+#   vcluster add-on. NOT the Harvester host cluster, NOT a guest cluster.
+#   Use the kubeconfig / kubectl context of the Rancher vcluster.
+#
+# Usage:
+#   kubectl --context <RANCHER_VCLUSTER_CONTEXT> apply -f harvester-ui-extension-clusterrepo.yaml
+#
+# Result:
+#   A cluster-scoped ClusterRepo named "harvester-ui-extension" that Rancher
+#   syncs from the gh-pages branch. The chart list then shows up under
+#   Rancher > Extensions (Available tab).
+#
+# Verify:
+#   kubectl --context <RANCHER_VCLUSTER_CONTEXT> get clusterrepo harvester-ui-extension
+#   (the Downloaded condition should become True; check .status if not)
+#
+# Notes / assumptions:
+#   - gitRepo/gitBranch are from the upstream Harvester docs as I recall them;
+#     confirm against the docs for your Harvester/Rancher version (unverified).
+#   - This only registers the repo. The extension itself is still installed
+#     from the Rancher UI (Extensions > Harvester > Install), pinning a
+#     version compatible with your Harvester release.
+#   - Rancher must be able to reach github.com (egress/proxy from the vcluster).
+# -----------------------------------------------------------------------------
+apiVersion: catalog.cattle.io/v1
+kind: ClusterRepo
+metadata:
+  name: harvester-ui-extension
+spec:
+  gitRepo: https://github.com/harvester/harvester-ui-extension
+  gitBranch: gh-pages
