@@ -1,0 +1,152 @@
+# -----------------------------------------------------------------------------
+# Description:
+#   Creates the rancher-vcluster namespace and enables the experimental
+#   rancher-vcluster Harvester add-on. It runs a nested K3s cluster (vCluster)
+#   inside Harvester and deploys Rancher Manager into it.
+#
+# Type:
+#   Harvester Addon (experimental add-on; not in the catalog, built from the
+#   official experimental-addons manifest)
+#
+# Target:
+#   The Harvester cluster itself (use the Harvester kubeconfig).
+#
+# Usage:
+#   kubectl apply -f rancher-vcluster-addon.yaml
+#
+# Result:
+#   Addon "rancher-vcluster" is enabled in namespace rancher-vcluster. The
+#   vcluster StatefulSet starts, then Rancher is deployed inside it (this can
+#   take several minutes). Rancher is reachable at https://<hostname>.
+#
+# Verify:
+#   kubectl get addon -n rancher-vcluster rancher-vcluster
+#   kubectl get pods -n rancher-vcluster
+#   kubectl get ingress -n rancher-vcluster
+#
+# Notes / assumptions:
+#   - Set global.hostname to a DNS record that points at the Harvester VIP.
+#     The vcluster ingress is synced to the host cluster and is filtered by
+#     this hostname, so it must resolve before you can open Rancher.
+#   - Replace <CHANGE_ME> for bootstrapPassword. Do not commit the real value
+#     to Git; the password sits in plain text in this manifest.
+#   - Chart/image/Rancher versions below were copied from the upstream "main"
+#     branch of harvester/experimental-addons at the time of writing. They may
+#     not match your Harvester version: UNVERIFIED, compare with the manifest
+#     for your release before applying.
+#   - Disabling the add-on keeps the Longhorn PVC data-rancher-vcluster-0;
+#     re-enabling restores the old Rancher state. Delete the PVC to wipe it.
+# -----------------------------------------------------------------------------
+---
+# Namespace that holds the add-on and the vcluster workload
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rancher-vcluster
+---
+# The add-on itself (a wrapper around an RKE2 HelmChart for the vcluster chart)
+apiVersion: harvesterhci.io/v1beta1
+kind: Addon
+metadata:
+  name: rancher-vcluster
+  namespace: rancher-vcluster
+  labels:
+    addon.harvesterhci.io/experimental: "true"
+spec:
+  enabled: true # upstream default is false; true enables it on apply
+  repo: https://charts.loft.sh
+  version: "v0.30.0"
+  chart: vcluster
+  valuesContent: |-
+    global:
+      hostname: "rancher.ct.local"   # DNS record pointing to the Harvester VIP
+      rancherVersion: v2.14.0
+      bootstrapPassword: "password"
+
+    sync:
+      toHost:
+        ingresses:
+          enabled: true
+
+    controlPlane:
+      distro:
+        k3s:
+          enabled: true
+          image:
+            registry: ""
+            repository: "rancher/k3s"
+            tag: "v1.35.4-k3s1"
+          securityContext: {}
+          resources:
+            limits:
+              cpu: 100m
+              memory: 256Mi
+            requests:
+              cpu: 40m
+              memory: 64Mi
+      backingStore:
+        database:
+          embedded:
+            enabled: true
+
+      statefulSet:
+        image:
+          registry: "ghcr.io"
+          repository: "loft-sh/vcluster-pro"
+          tag: "0.30.0"
+        resources:
+          limits:
+            ephemeral-storage: 10Gi
+            memory: 4Gi
+          requests:
+            ephemeral-storage: 1Gi
+            cpu: 200m
+            memory: 256Mi
+
+    experimental:
+      deploy:
+        vcluster:
+          manifestsTemplate: |-
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: cattle-system
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: cert-manager
+              labels:
+                certmanager.k8s.io/disable-validation: "true"
+            ---
+            apiVersion: helm.cattle.io/v1
+            kind: HelmChart
+            metadata:
+              name: cert-manager
+              namespace: kube-system
+            spec:
+              targetNamespace: cert-manager
+              repo: https://charts.jetstack.io
+              chart: cert-manager
+              version: v1.5.1
+              helmVersion: v3
+              set:
+                installCRDs: "true"
+            ---
+            apiVersion: helm.cattle.io/v1
+            kind: HelmChart
+            metadata:
+              name: rancher
+              namespace: kube-system
+            spec:
+              targetNamespace: cattle-system
+              repo: https://releases.rancher.com/server-charts/latest
+              chart: rancher
+              version: {{ .Values.global.rancherVersion }}
+              set:
+                ingress.tls.source: rancher
+                hostname: {{ .Values.global.hostname }}
+                replicas: 1
+                global.cattle.psp.enabled: "false"
+                bootstrapPassword: {{ .Values.global.bootstrapPassword }}
+              helmVersion: v3
