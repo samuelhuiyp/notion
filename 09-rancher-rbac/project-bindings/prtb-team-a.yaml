@@ -1,0 +1,8 @@
+apiVersion: management.cattle.io/v3
+kind: ProjectRoleTemplateBinding
+metadata:
+  name: test-project-member
+  namespace: c-hprl5-p-z5fxr
+projectName: c-hprl5:p-z5fxr
+roleTemplateName: project-member
+userPrincipalName: local://m-6zvbj      # or groupPrincipalName: <provider>_group://<group>

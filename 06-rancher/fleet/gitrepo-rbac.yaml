@@ -1,0 +1,12 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: rancher-rbac
+  namespace: fleet-local
+spec:
+  repo: https://github.com/samuelhuiyp/notion
+  branch: main
+  paths:
+    - 09-rancher-rbac
+  targets:
+    - clusterName: local
