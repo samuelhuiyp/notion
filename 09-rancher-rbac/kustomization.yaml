@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - roletemplates/vm-operator.yaml
+#  - roletemplates/vm-operator.yaml
   - cluster-bindings/crtb-harvester-ops.yaml
   - project-bindings/prtb-team-a.yaml
 # Do NOT set `namespace:` here. It would override the namespaces
