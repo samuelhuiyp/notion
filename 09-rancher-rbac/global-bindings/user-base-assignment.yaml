@@ -1,0 +1,7 @@
+apiVersion management.cattle.iov3
+kind GlobalRoleBinding
+metadata
+  name grb-harvester-ops-user-base
+globalRoleName user-base
+userName local://m-6zvbj                        # the user's object name
+# or groupPrincipalName provider_groupgroup
