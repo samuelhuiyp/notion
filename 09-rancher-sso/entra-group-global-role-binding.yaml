@@ -1,0 +1,39 @@
+# -----------------------------------------------------------------------------
+# Description:
+#   Binds the Microsoft Entra ID group SG_Rancher_Admin (object ID f5644315-9653-43c3-b239-41cab3792871) to a Rancher
+#   global role, so every member of that group gets the role when they log in through Entra SSO on rancher.ct.local.
+#
+# Type:
+#   Rancher RBAC (management.cattle.io/v3 GlobalRoleBinding). Not in the standard Harvester catalog; field names
+#   are from my knowledge of Rancher, not from a schema or export (unverified, see Notes).
+#
+# Target:
+#   Rancher management (local) cluster only, never Harvester or guest clusters.
+#
+# Usage:
+#   kubectl diff  -f rancher-entra-group-globalrolebinding.yaml
+#   kubectl apply -f rancher-entra-group-globalrolebinding.yaml
+#
+# Result:
+#   GlobalRoleBinding "grb-sg-rancher-admin" exists; members of the Entra group are granted the global role below.
+#
+# Verify:
+#   kubectl get globalrolebinding grb-sg-rancher-admin -o yaml
+#   kubectl get globalroles
+#
+# Notes / assumptions:
+#   - globalRoleName is set to "admin" because the group is named SG_Rancher_Admin. This is full administrator access
+#     to Rancher. Change it (for example to "user" or "user-base") if that is more than you intend.
+#     List the roles available on your Rancher with: kubectl get globalroles
+#   - groupPrincipalName format is azuread_group://<Entra group object ID>, the same ID used in allowedPrincipalIds.
+#   - The group must also be allowed to log in (allowedPrincipalIds in the AuthConfig), otherwise the binding never applies.
+#   - Field names (globalRoleName, groupPrincipalName) are unverified. Best check: create one binding in the Rancher UI
+#     (Users & Authentication > Groups) and compare it with: kubectl get globalrolebinding -o yaml
+# -----------------------------------------------------------------------------
+
+apiVersion: management.cattle.io/v3
+kind: GlobalRoleBinding
+metadata:
+  name: grb-sg-rancher-user-base
+globalRoleName: user-base
+groupPrincipalName: azuread_group://f5644315-9653-43c3-b239-41cab3792871

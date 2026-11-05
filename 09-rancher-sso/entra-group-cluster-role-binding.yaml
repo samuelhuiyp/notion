@@ -1,0 +1,45 @@
+# -----------------------------------------------------------------------------
+# Description:
+#   Grants a Microsoft Entra ID group a cluster-level role on one cluster managed by Rancher (for example the
+#   imported Harvester cluster), so members of the group get that role after logging in through Entra SSO.
+#
+# Type:
+#   Rancher RBAC (management.cattle.io/v3 ClusterRoleTemplateBinding). Not in the standard Harvester catalog;
+#   field names are from my knowledge of Rancher, not from an export (unverified, see Notes).
+#
+# Target:
+#   Rancher management (local) cluster only. The binding is created there and Rancher applies it to the
+#   downstream cluster named in clusterName.
+#
+# Usage:
+#   kubectl diff  -f rancher-entra-group-clusterrolebinding.yaml
+#   kubectl apply -f rancher-entra-group-clusterrolebinding.yaml
+#
+# Result:
+#   ClusterRoleTemplateBinding "crtb-sg-harvester-members" exists in the namespace of the cluster, and the Entra
+#   group has the chosen role on that cluster.
+#
+# Verify:
+#   kubectl get clusterroletemplatebinding crtb-sg-harvester-members -n <CHANGE_ME_CLUSTER_ID> -o yaml
+#   kubectl get roletemplates
+#
+# Notes / assumptions:
+#   - <CHANGE_ME_CLUSTER_ID> is the Rancher internal cluster ID (for example c-m-xxxxxxxx, or "local").
+#     It is used twice: as metadata.namespace and as clusterName. Find it with:
+#       kubectl get clusters.management.cattle.io
+#   - roleTemplateName "cluster-member" is a placeholder choice (less access than "cluster-owner"). Check the
+#     real names on your Rancher with: kubectl get roletemplates. Cluster-scoped templates have context "cluster".
+#   - groupPrincipalName format is azuread_group://<Entra group object ID>, the same ID used in allowedPrincipalIds.
+#     The group must also be allowed to log in (allowedPrincipalIds).
+#   - Field names (clusterName, roleTemplateName, groupPrincipalName) are unverified. Safest check: create one binding
+#     in the Rancher UI (cluster > Cluster Members) and compare it with: kubectl get clusterroletemplatebinding -A -o yaml
+# -----------------------------------------------------------------------------
+
+apiVersion: management.cattle.io/v3
+kind: ClusterRoleTemplateBinding
+metadata:
+  name: crtb-sg-harvester-view-nodes
+  namespace: c-hprl5
+clusterName: c-hprl5
+roleTemplateName: nodes-view
+groupPrincipalName: azuread_group://f5644315-9653-43c3-b239-41cab3792871

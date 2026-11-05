@@ -1,0 +1,9 @@
+# cluster-bindings/crtb-harvester-ops.yaml
+apiVersion: management.cattle.io/v3
+kind: ClusterRoleTemplateBinding
+metadata:
+  name: harvester-ops-cluster-user-base
+  namespace: c-hprl5       # c-m-xxxxxxxx
+clusterName: c-hprl5
+roleTemplateName: user-base
+userPrincipalName: local://m-6zvbj      # or groupPrincipalName: <provider>_group://<group>

@@ -1,0 +1,24 @@
+apiVersion: management.cattle.io/v3
+kind: AuthConfig
+metadata:
+  name: azuread
+  annotations:
+    auth.cattle.io/azuread-endpoint-migrated: "true"
+    management.cattle.io/auth-provider-cleanup: unlocked
+  labels:
+    cattle.io/creator: norman
+type: azureADConfig
+accessMode: restricted
+allowedPrincipalIds:
+  - azuread_group://f5644315-9653-43c3-b239-41cab3792871
+applicationId: 3d4ba312-f26e-4cd3-881c-ff457da62761
+# comment here - applicationSecret
+authEndpoint: https://login.microsoftonline.com/6f117f8b-2d18-43e5-9303-30f00788af97/oauth2/v2.0/authorize
+enabled: true
+endpoint: https://login.microsoftonline.com/
+graphEndpoint: https://graph.microsoft.com
+groupMembershipFilter: displayName eq 'SG_Rancher_Admin'
+logoutAllSupported: false
+rancherUrl: https://rancher.ct.local/verify-auth-azure
+tenantId: 6f117f8b-2d18-43e5-9303-30f00788af97
+tokenEndpoint: https://login.microsoftonline.com/6f117f8b-2d18-43e5-9303-30f00788af97/oauth2/v2.0/token
