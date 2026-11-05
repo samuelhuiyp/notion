@@ -1,43 +1,12 @@
-# -----------------------------------------------------------------------------
-# Description:
-#   Grants a Microsoft Entra ID group the project-level "Manage Virtualization Resources" role on one Harvester
-#   project managed through Rancher, so group members can manage VMs and related resources in that project only.
+# prtb-sg-vm-managers: Gives the Entra ID group azuread_group://f5644315-9653-43c3-b239-41cab3792871 the project role virt-project-manage
+# ("Manage Virtualization Resources") on project p-z5fxr of cluster c-hprl5 (assumed to be the Harvester cluster). Members can manage VMs and
+# related resources in that project only. Apply it on the Rancher management (local) cluster, not on Harvester. The group also needs login
+# access (allowedPrincipalIds) and a global role such as user-base.
 #
-# Type:
-#   Rancher RBAC (management.cattle.io/v3 ProjectRoleTemplateBinding). Not in the standard Harvester catalog;
-#   field names are from my knowledge of Rancher, not from an export (unverified, see Notes).
-#
-# Target:
-#   Rancher management (local) cluster only. The binding is created there; Rancher applies it to the Harvester
-#   cluster that owns the project.
-#
-# Usage:
-#   kubectl diff  -f rancher-entra-group-projectrolebinding.yaml
-#   kubectl apply -f rancher-entra-group-projectrolebinding.yaml
-#
-# Result:
-#   ProjectRoleTemplateBinding "prtb-sg-vm-managers" exists in the project's namespace, and the Entra group has the
-#   virtualization manage role in that project.
-#
-# Verify:
-#   kubectl get projectroletemplatebinding prtb-sg-vm-managers -n <CHANGE_ME_PROJECT_ID> -o yaml
-#   kubectl get roletemplates
-#
-# Notes / assumptions:
-#   - <CHANGE_ME_CLUSTER_ID> and <CHANGE_ME_PROJECT_ID> are Rancher internal IDs (for example c-m-xxxxxxxx and
-#     p-xxxxx). Find them with:  kubectl get projects.management.cattle.io -A
-#     projectName must be "<cluster-id>:<project-id>", and metadata.namespace is the project ID.
-#   - roleTemplateName: Harvester's docs call this role "Manage Virtualization Resources" (project scope, based on
-#     Project User). I do NOT know its internal ID. Find it with:
-#       kubectl get roletemplates -o custom-columns=NAME:.metadata.name,DISPLAY:.displayName,CONTEXT:.context | grep -i virtualization
-#     Use the NAME of the row whose DISPLAY is "Manage Virtualization Resources" and CONTEXT is "project".
-#   - These virtualization roles are installed by the Harvester RBAC Helm chart. If the roletemplates list shows
-#     nothing, that chart is missing and the binding will be rejected.
-#   - groupPrincipalName format is azuread_group://<Entra group object ID>, as in allowedPrincipalIds. The group must
-#     also be allowed to log in (allowedPrincipalIds in the AuthConfig).
-#   - Field names (projectName, roleTemplateName, groupPrincipalName) are unverified. Safest check: add one member to
-#     the project in the UI and compare with:  kubectl get projectroletemplatebinding -A -o yaml
-# -----------------------------------------------------------------------------
+#   kubectl diff   -f config/rancher/rancher-entra-group-prtb-vm-manage.yaml
+#   kubectl apply  -f config/rancher/rancher-entra-group-prtb-vm-manage.yaml
+#   kubectl get projectroletemplatebinding prtb-sg-vm-managers -n c-hprl5-p-z5fxr -o yaml
+#   kubectl delete -f config/rancher/rancher-entra-group-prtb-vm-manage.yaml
 
 apiVersion: management.cattle.io/v3
 kind: ProjectRoleTemplateBinding

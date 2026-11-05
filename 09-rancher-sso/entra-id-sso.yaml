@@ -1,3 +1,13 @@
+# azuread: Rancher Azure AD (Entra ID) login for rancher.ct.local, restricted to the Entra group azuread_group://f5644315-9653-43c3-b239-41cab3792871.
+# Apply it on the Rancher management (local) cluster only. The client secret is deliberately NOT in this file: Rancher keeps it in the Secret
+# cattle-global-data/azureadconfig-applicationsecret, so this file only works on a Rancher where that Secret already exists.
+# Docs: https://ranchermanager.docs.rancher.com/how-to-guides/new-user-guides/authentication-permissions-and-global-configuration/authentication-config/configure-azure-ad
+#
+#   kubectl diff   -f config/rancher/rancher-azuread-authconfig-nosecret.yaml
+#   kubectl apply  -f config/rancher/rancher-azuread-authconfig-nosecret.yaml
+#   kubectl get authconfig azuread -o jsonpath='{.enabled} {.accessMode} {.allowedPrincipalIds}{"\n"}'
+#   kubectl delete -f config/rancher/rancher-azuread-authconfig-nosecret.yaml
+
 apiVersion: management.cattle.io/v3
 kind: AuthConfig
 metadata:
@@ -12,7 +22,8 @@ accessMode: restricted
 allowedPrincipalIds:
   - azuread_group://f5644315-9653-43c3-b239-41cab3792871
 applicationId: 3d4ba312-f26e-4cd3-881c-ff457da62761
-# comment here - applicationSecret
+# applicationSecret is intentionally omitted. In a Rancher export it appears as the reference
+# cattle-global-data:azureadconfig-applicationsecret; the real value lives only in that Secret, never in Git.
 authEndpoint: https://login.microsoftonline.com/6f117f8b-2d18-43e5-9303-30f00788af97/oauth2/v2.0/authorize
 enabled: true
 endpoint: https://login.microsoftonline.com/
