@@ -4,5 +4,6 @@ kind: Kustomization
 # CRDs), the ct.local certificate/CA in place (11-cert-manager), and secrets in
 # secrets/ created out-of-band (from *.example.yaml) BEFORE applying the profiles.
 resources:
+  - k10-volumesnapshotclass-longhorn.yaml
   - location-profiles.yaml
   - policies.yaml

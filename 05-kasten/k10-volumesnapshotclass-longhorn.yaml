@@ -1,0 +1,23 @@
+# k10-longhorn-snap: VolumeSnapshotClass that Kasten uses to snapshot Longhorn volumes (CSI driver driver.longhorn.io), i.e. Harvester VM
+# disks, on the Harvester cluster. Kasten only uses classes annotated k10.kasten.io/is-snapshot-class=true, and expects exactly one per
+# driver: Harvester's built-in longhorn-snapshot/longhorn classes stay unannotated (Harvester's own VM snapshots use them). type: snap makes
+# an in-cluster Longhorn snapshot; Kasten then exports the data to its location profile. Fixes "Failed to find VolumeSnapshotClass with
+# annotation in the cluster". Docs: https://docs.kasten.io/latest/install/storage
+#
+#   kubectl diff   -f 05-kasten/k10-volumesnapshotclass-longhorn.yaml
+#   kubectl apply  -f 05-kasten/k10-volumesnapshotclass-longhorn.yaml
+#   kubectl get volumesnapshotclass -o custom-columns=NAME:.metadata.name,DRIVER:.driver,K10:.metadata.annotations.k10\.kasten\.io/is-snapshot-class
+#   kubectl delete -f 05-kasten/k10-volumesnapshotclass-longhorn.yaml
+
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: k10-longhorn-snap
+  annotations:
+    k10.kasten.io/is-snapshot-class: "true"
+  labels:
+    app.kubernetes.io/part-of: kasten
+driver: driver.longhorn.io
+deletionPolicy: Delete
+parameters:
+  type: snap

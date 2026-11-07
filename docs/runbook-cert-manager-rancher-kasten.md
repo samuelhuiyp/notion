@@ -427,7 +427,30 @@ echo | openssl s_client -connect kasten.ct.local:443 -servername kasten.ct.local
 3. You land back on Kasten. **Accept the EULA** in the dashboard; it's no longer set at install time.
 4. The dashboard shows full admin access, because that account is the `k10-admin` user.
 
-### 5.4 Profiles and policies
+### 5.4 Snapshot class for Longhorn, then profiles and policies
+
+Kasten only snapshots a PVC through a VolumeSnapshotClass that has the annotation `k10.kasten.io/is-snapshot-class: "true"` for the PVC's CSI driver. Without one, every backup fails with *Failed to find VolumeSnapshotClass with annotation in the cluster*. Harvester VM disks use Longhorn (`driver.longhorn.io`). Harvester's built-in classes stay unannotated, because Harvester's own VM snapshots use them.
+
+```bash
+use-harvester
+# Which CSI driver do the protected PVCs use? (expect driver.longhorn.io)
+kubectl -n vm-test get pvc -o custom-columns=PVC:.metadata.name,SC:.spec.storageClassName
+kubectl get sc -o custom-columns=SC:.metadata.name,PROVISIONER:.provisioner
+
+kubectl apply -f 05-kasten/k10-volumesnapshotclass-longhorn.yaml
+```
+
+**Validate:** exactly one annotated class per driver.
+```bash
+kubectl get volumesnapshotclass -o custom-columns=NAME:.metadata.name,DRIVER:.driver,K10:.metadata.annotations.k10\.kasten\.io/is-snapshot-class
+# k10-longhorn-snap   driver.longhorn.io   true
+# longhorn-snapshot   driver.longhorn.io   <none>     (Harvester built-in, must stay <none>)
+# longhorn            driver.longhorn.io   <none>
+```
+
+If a PVC uses another driver (e.g. NetApp `csi.trident.netapp.io`), apply its class from `03-storage-classes/volume-snapshot-classes.yaml`. Then re-run the backup from the Kasten dashboard; the precheck passes.
+
+Profiles and policies:
 
 After the location-profile secrets exist (from `05-kasten/secrets/*.example.yaml`):
 
@@ -547,6 +570,7 @@ These cost the most time in the first run. Each is now built into the steps abov
 | `addons.k3s.cattle.io "rancher-vcluster" not found` | kubectl's short name `addon` picked RKE2's resource | use `addons.harvesterhci.io` |
 | Pods in `rancher-vcluster` all hours old after step 3.1 | expected if the same values were already applied; otherwise the change didn't roll out | values grep = 3 and step 3.2 passes → fine; grep < 3 → re-apply 3.1 |
 | Helm job: `exists and cannot be imported into the current release` | leftovers from an earlier attempt | step 0.4, then re-run 1.3 and onwards |
+| Backup: `Failed to find VolumeSnapshotClass with annotation in the cluster` | no Kasten-annotated VolumeSnapshotClass for the PVC's CSI driver | step 5.4: `05-kasten/k10-volumesnapshotclass-longhorn.yaml` |
 | Same error naming `Secret "k10-oidc-auth"` | client secret given the chart's reserved name | delete it; recreate as `kasten-oidc-client` (step 5.1) |
 | Kasten pods running but `cannot resolve rancher.ct.local`, and `whereami` → RANCHER | Kasten installed inside the vcluster | step 0.4 (remove it there), then 5.2 with `use-harvester` |
 | `env: 'bash\r': No such file or directory` | CRLF line endings from a Windows checkout | `sed -i 's/\r$//' scripts/*.sh` |
