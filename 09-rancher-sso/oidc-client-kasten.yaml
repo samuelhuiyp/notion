@@ -1,6 +1,6 @@
 # kasten: Registers Kasten (https://kasten.ct.local/k10) as a client of Rancher's OIDC provider. Rancher generates the client ID (status) and
 # client secret (Secret in namespace cattle-oidc-client-secrets); scripts/sync-kasten-oidc-secret.sh copies both to Harvester as
-# kasten-io/k10-oidc-auth. Apply on the Rancher management (local) cluster after oidc-provider-feature.yaml. The redirect URI must match the
+# kasten-io/kasten-oidc-client. Apply on the Rancher management (local) cluster after oidc-provider-feature.yaml. The redirect URI must match the
 # Kasten callback exactly, including the /k10 URL path.
 #
 #   kubectl diff   -f 09-rancher-sso/oidc-client-kasten.yaml

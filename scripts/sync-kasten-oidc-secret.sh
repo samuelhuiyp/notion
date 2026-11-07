@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Copies the Kasten OIDC client credentials from Rancher to Harvester:
 #   Rancher:   oidcclient/kasten .status.clientID + Secret cattle-oidc-client-secrets/<clientID>
-#   Harvester: Secret kasten-io/k10-oidc-auth  (keys client-id, client-secret)  -> referenced by auth.oidcAuth.clientSecretName
+#   Harvester: Secret kasten-io/kasten-oidc-client  (keys client-id, client-secret)  -> referenced by auth.oidcAuth.clientSecretName
 # Re-run after rotating the client secret in Rancher. Nothing is printed except key names.
 # Usage: RANCHER_CONTEXT=<rancher-vcluster ctx> HARVESTER_CONTEXT=<harvester ctx> ./scripts/sync-kasten-oidc-secret.sh
 set -euo pipefail
@@ -14,7 +14,7 @@ key=$(kubectl --context "$R" -n cattle-oidc-client-secrets get secret "$id" -o j
 [[ -n "$key" ]] || { echo "No client-secret* key in cattle-oidc-client-secrets/$id; keys are:" >&2
   kubectl --context "$R" -n cattle-oidc-client-secrets get secret "$id" -o json | jq -r '.data | keys[]' >&2; exit 1; }
 secret=$(kubectl --context "$R" -n cattle-oidc-client-secrets get secret "$id" -o json | jq -r --arg k "$key" '.data[$k]' | base64 -d)
-kubectl --context "$H" -n kasten-io create secret generic k10-oidc-auth \
+kubectl --context "$H" -n kasten-io create secret generic kasten-oidc-client \
   --from-literal=client-id="$id" --from-literal=client-secret="$secret" --dry-run=client -o yaml \
   | kubectl --context "$H" apply -f -
-echo "kasten-io/k10-oidc-auth updated (client-id=$id, from key $key)."
+echo "kasten-io/kasten-oidc-client updated (client-id=$id, from key $key)."

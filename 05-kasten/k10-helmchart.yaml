@@ -1,6 +1,6 @@
 # k10: Installs Veeam Kasten on the Harvester cluster itself (namespace kasten-io, via RKE2 helm-controller), NOT inside Rancher. UI at
 # https://kasten.ct.local/k10 with the cert-manager Secret kasten-io/wildcard-ct-local-tls. Users log in through Rancher's OIDC provider
-# (https://rancher.ct.local/oidc) with client credentials from kasten-io/k10-oidc-auth; Kasten trusts the ct.local CA through ConfigMap
+# (https://rancher.ct.local/oidc) with client credentials from kasten-io/kasten-oidc-client; Kasten trusts the ct.local CA through ConfigMap
 # kasten-io/custom-ca-bundle-store. Set the admin user (<CHANGE_ME>) before applying; then apply 05-kasten (profiles, policies).
 #
 #   kubectl diff   -f 05-kasten/k10-helmchart.yaml
@@ -41,7 +41,9 @@ spec:
         providerURL: https://rancher.ct.local/oidc
         redirectURL: https://kasten.ct.local      # Kasten appends /k10/auth-svc/v0/oidc/redirect (= OIDCClient redirectURIs)
         scopes: "openid profile"
-        clientSecretName: k10-oidc-auth           # keys client-id, client-secret (scripts/sync-kasten-oidc-secret.sh)
+        # Keys client-id, client-secret (scripts/sync-kasten-oidc-secret.sh). Must NOT be named k10-oidc-auth:
+        # the chart creates its own Secret with that name.
+        clientSecretName: kasten-oidc-client
         usernameClaim: sub
         usernamePrefix: "rancher:"
         groupClaim: groups
