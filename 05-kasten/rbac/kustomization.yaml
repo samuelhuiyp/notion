@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# Apply on Harvester after Kasten (05-kasten/k10-helmchart.yaml). The binding has the placeholder
-# rancher:<CHANGE_ME>; apply it separately with sed (see its header), so it is not listed here.
+# Apply on Harvester after Kasten (05-kasten/k10-helmchart.yaml).
 resources:
   - k10-rbac-guardrail-vap.yaml
   - k10-rbac-manager-clusterrole.yaml
+  - k10-rbac-manager-binding.yaml

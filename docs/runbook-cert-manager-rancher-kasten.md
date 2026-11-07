@@ -441,15 +441,14 @@ kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kaste
 
 `k10-admin` has no permissions on Kubernetes RBAC, so the dashboard's roles and bindings pages are read-only or refused for it. The files in `05-kasten/rbac/` add, on Harvester:
 - **`k10-rbac-manager` ClusterRole:** view and manage roles and bindings; `bind` only Kasten's built-in roles; no `escalate`.
-- **`k10-rbac-managers` ClusterRoleBinding** for the Kasten admin user.
+- **`k10-rbac-managers` ClusterRoleBinding** for the Kasten user `rancher:user-6hc67` (Rancher local user `user-6hc67`).
 - **`k10-rbac-guardrail` ValidatingAdmissionPolicy:** Kasten dashboard users (`rancher:*`) may only change `k10-*` roles and bindings to `k10-*` roles.
 
 ```bash
 use-harvester
 kubectl api-resources | grep -c validatingadmissionpolicies     # >= 1 (Kubernetes 1.30+)
-ADMIN=<rancher-user-id-from-4.3>
-kubectl apply -k 05-kasten/rbac
-sed "s|rancher:<CHANGE_ME>|rancher:$ADMIN|" 05-kasten/rbac/k10-rbac-manager-binding.yaml | kubectl apply -f -
+ADMIN=user-6hc67                                 # used by the checks below
+kubectl apply -k 05-kasten/rbac                  # policy, ClusterRole and binding
 ```
 
 **Validate (RBAC):**
