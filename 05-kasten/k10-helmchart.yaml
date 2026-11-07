@@ -81,19 +81,37 @@ spec:
     # This does NOT block backups: a policy that selects these namespaces still backs them up.
     # The policies in 05-kasten/policies.yaml select namespaces by name, so none of these is selected.
     excludedApps:
+      # Kubernetes / Harvester / storage system namespaces
       - kube-system
       - kube-public
       - kube-node-lease
+      - default                      # WARNING: Harvester's default VM namespace - VMs created here are hidden from compliance
       - harvester-system
+      - harvester-public             # shared VM images and templates
       - longhorn-system
-      - cattle-system
-      - cattle-fleet-system
-      - cattle-monitoring-system
-      - cattle-logging-system
-      - cattle-capi-system           # Rancher Cluster API (CAPI) controllers
-      - cattle-dashboards            # Rancher monitoring dashboards
-      - fleet-local
-      - local
+      - cert-manager
+      - ct-local-tls
       - trident
       - portworx
-      - cert-manager
+      # Rancher (embedded in Harvester) namespaces
+      - cattle-system
+      - cattle-capi-system           # Rancher Cluster API (CAPI) controllers
+      - cattle-dashboards            # Rancher monitoring dashboards
+      - cattle-fleet-system
+      - cattle-fleet-clusters-system
+      - cattle-fleet-local-system
+      - cattle-impersonation-system
+      - cattle-local-user-passwords
+      - cattle-logging-system
+      - cattle-monitoring-system
+      - cattle-tokens
+      - cattle-turtles-system
+      - cattle-ui-plugin-system
+      - fleet-default
+      - fleet-local
+      - local
+      # Generated names: new Rancher users / Fleet re-registration create new ones, add them when they appear
+      - cluster-fleet-local-local-1a3d67d0a899
+      - user-hskq6
+      # WARNING: holds Rancher's state (vcluster PVC) and no policy backs it up yet
+      - rancher-vcluster
