@@ -15,6 +15,18 @@ Every step ends with a **Validate** block. Don't continue until it shows the exp
 
 Run everything from the repo root in WSL (`/mnt/c/Users/Samuel/git/notion`) on branch `claude/cert-manager-rancher-oidc-kasten`.
 
+**Status:** tested end to end in the ct.local lab in November 2026: Rancher on the ct.local certificate, and Kasten login through Rancher's OIDC provider working.
+
+| Component | Version in the test | Where |
+|---|---|---|
+| Harvester | built-in ingress controller is **Traefik** (`rancher-expose` class `traefik`) on VIP 192.168.1.60 | host cluster |
+| cert-manager | v1.18.2 | Harvester, namespace `cert-manager` |
+| vcluster add-on | chart v0.30.0, k3s v1.35.4 | Harvester, namespace `rancher-vcluster` |
+| Rancher | v2.14.0 (community chart) | inside the vcluster |
+| Kasten | chart 9.0.8 | Harvester, namespace `kasten-io` |
+
+Read **Lessons from the first test run** at the end before starting: it lists the mistakes that cost the most time.
+
 ---
 
 ## 0. Preparation
@@ -95,11 +107,11 @@ Look at the `CLASS` and `ADDRESS` of `cattle-system/rancher-expose` (Harvester's
 
 Rancher and Kasten then share port 443 on one IP, routed by hostname.
 
-Write down the two IPs:
-- **`RANCHER_IP`:** where `rancher.ct.local` points today (`getent hosts rancher.ct.local`, or your hosts file).
-- **`KASTEN_IP`:** the IP from the matching table row.
+Write down the two IPs. In the tested lab both are `192.168.1.60`, because Rancher and Kasten share Harvester's Traefik:
+- **`RANCHER_IP`:** the ADDRESS of the `rancher-x-cattle-system-x-rancher-vcluster` ingress.
+- **`KASTEN_IP`:** the ADDRESS of `rancher-expose` (Kasten's ingress will get the same one).
 
-If the answer is `nginx`, step 5.2 swaps the value while applying. Tell Claude afterwards so the repo file gets corrected.
+If `rancher-expose` uses `nginx` on a different Harvester, step 5.2 says how to override the class.
 
 ### 0.4 Clean up earlier Kasten attempts
 
@@ -376,27 +388,25 @@ kubectl -n kasten-io get secret kasten-oidc-client -o jsonpath='{.data.client-id
 
 ### 5.2 Install Kasten
 
-Fill in the admin user, and the ingress class if step 0.3 said `nginx`, through the pipe. The repo file stays unchanged.
+Fill in the admin user through the pipe, so the repo file keeps `<CHANGE_ME>`. The file already has `class: traefik`, which matches this Harvester (step 0.3). Only on a Harvester whose `rancher-expose` uses `nginx`, add `-e "s|class: traefik|class: nginx|"` to the `sed`.
 
 ```bash
 use-harvester
 whereami                                             # -> HARVESTER  (Kasten must NOT go into the vcluster)
 ADMIN=<rancher-user-id-from-4.3>                     # e.g. u-abc12
-CLASS=traefik                                        # or nginx, from step 0.3
-sed -e "s|rancher:<CHANGE_ME>|rancher:$ADMIN|" -e "s|class: traefik|class: $CLASS|" 05-kasten/k10-helmchart.yaml \
-  | kubectl apply -f -
+sed -e "s|rancher:<CHANGE_ME>|rancher:$ADMIN|" 05-kasten/k10-helmchart.yaml | kubectl apply -f -
 ```
 
 **Validate:**
 ```bash
 kubectl -n kube-system get helmchart k10 -o jsonpath='{.spec.valuesContent}' | grep -E 'clientSecretName|class:|rancher:'
-# clientSecretName: kasten-oidc-client ; class: <CLASS> ; - "rancher:<ADMIN>"
+# clientSecretName: kasten-oidc-client ; class: traefik ; - "rancher:<ADMIN>"
 kubectl -n kube-system logs -f job/helm-install-k10 | tail -5       # STATUS: deployed
 kubectl -n kasten-io get pods                                        # all Running, auth-svc 1/1
 kubectl -n kasten-io get deploy auth-svc \
   -o jsonpath='{.spec.template.spec.volumes[?(@.name=="k10-oidc-auth-creds")].secret.secretName}{"\n"}'   # kasten-oidc-client
 kubectl -n kasten-io logs deploy/auth-svc --tail=20 | grep -i -E 'error|panic' || echo "auth-svc: no errors"
-kubectl -n kasten-io get ingress -o wide                             # CLASS <CLASS>, HOSTS kasten.ct.local, ADDRESS <KASTEN_IP>
+kubectl -n kasten-io get ingress -o wide                             # CLASS traefik, HOSTS kasten.ct.local, ADDRESS 192.168.1.60
 kubectl get clusterrolebinding -o json \
   | jq -r '.items[] | select(.roleRef.name=="k10-admin") | .metadata.name + " -> " + ([.subjects[]?.name] | join(","))'
 # ... -> rancher:<ADMIN>
@@ -428,6 +438,19 @@ kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kaste
 
 ---
 
+## Lessons from the first test run
+
+These cost the most time in the first run. Each is now built into the steps above.
+
+1. **Check which cluster you're on, every time.** All the downloaded kubeconfigs named their context `local` and pointed at Rancher's vcluster, not Harvester, so Kasten was first installed in the wrong cluster. Use the per-cluster files and `whereami` (step 0.2). Never trust a context name.
+2. **Kasten belongs on Harvester, not in the vcluster.** In the vcluster it can't resolve `rancher.ct.local` (vcluster pods use the vcluster's own CoreDNS, not Harvester's), and it can't see the VMs it should protect.
+3. **Match Harvester's own ingress controller.** This Harvester runs Traefik, not rke2-ingress-nginx. With `class: nginx`, the Kasten ingress had no ADDRESS and `kasten.ct.local` didn't load. Check `rancher-expose` (step 0.3).
+4. **Don't name the client secret `k10-oidc-auth`.** The Kasten chart creates its own Secret with that name, so the install fails with `exists and cannot be imported`. The repo uses `kasten-oidc-client`.
+5. **Use the full resource name `addons.harvesterhci.io`.** Plain `addon` resolves to RKE2's `addons.k3s.cattle.io` and returns NotFound.
+6. **Confirm the add-on change rolled out.** After step 3.1, the install jobs in `rancher-vcluster` must be minutes old, not hours. Old jobs mean Rancher is still on its old certificate, and Kasten's login fails because Rancher's certificate isn't from the ct.local CA.
+7. **Windows checkouts break the scripts.** CRLF line endings cause `env: 'bash\r': No such file or directory`. Run `git config core.autocrlf input` and `sed -i 's/\r$//' scripts/*.sh` (step 0.1).
+8. **The EULA is accepted in the dashboard, not at install.** The chart no longer sets `eula`, so the first login asks for it (step 5.3).
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Check / fix |
@@ -444,3 +467,8 @@ kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kaste
 | `addons.k3s.cattle.io "rancher-vcluster" not found` | kubectl's short name `addon` picked RKE2's resource | use `addons.harvesterhci.io` |
 | Pods in `rancher-vcluster` all hours old after step 3.1 | add-on change not applied or not rolled out | 3.1 checks: values grep = 3; then re-apply |
 | Helm job: `exists and cannot be imported into the current release` | leftovers from an earlier attempt | step 0.4, then re-run 1.3 and onwards |
+| Same error naming `Secret "k10-oidc-auth"` | client secret given the chart's reserved name | delete it; recreate as `kasten-oidc-client` (step 5.1) |
+| Kasten pods running but `cannot resolve rancher.ct.local`, and `whereami` → RANCHER | Kasten installed inside the vcluster | step 0.4 (remove it there), then 5.2 with `use-harvester` |
+| `env: 'bash\r': No such file or directory` | CRLF line endings from a Windows checkout | `sed -i 's/\r$//' scripts/*.sh` |
+| `jq: command not found` | jq missing in WSL Fedora | `sudo dnf install -y jq` |
+| `error: the server doesn't have a resource type "settings"` from `whereami`-style checks | kubeconfig points at the vcluster | step 0.2: rebuild `~/.kube/harvester.yaml` from a node's `rke2.yaml` |
