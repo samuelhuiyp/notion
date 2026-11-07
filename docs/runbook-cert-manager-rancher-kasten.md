@@ -476,6 +476,46 @@ kubectl get rolebinding -A -o json | jq -r '.items[] | select(.roleRef.name=="k1
 
 The guardrail only applies if the dashboard makes changes **as the logged-in user**. To confirm, try to bind a non-Kasten role, such as `view`, from the dashboard. It must be refused, by either Kubernetes RBAC or the guardrail. If it succeeds, the dashboard is acting as Kasten's own service account; stop and report it.
 
+### 5.6 Let vm-test users delete and expire their own restore points
+
+`k10-basic` can delete the namespaced `RestorePoint`, but that leaves the backup data in place. Deleting or expiring the backup acts on the cluster-scoped `RestorePointContent`, which a namespace RoleBinding can't grant, and Kasten's aggregated API ignores Kubernetes admission policies. `05-kasten/rbac/vm-test-restorepoints/` therefore grants it **by name**:
+- **`k10-rpc-vm-test` ClusterRole:** get/update/patch/delete on `restorepointcontents`, limited to `resourceNames`.
+- **`k10-rpc-sync` CronJob** (kasten-io, every 5 min): writes the names of all `RestorePointContent`s labelled `k10.kasten.io/appNamespace=vm-test` into that role.
+- **`k10-rpc-vm-test` ClusterRoleBinding** for the vm-test user.
+
+**Pick the image tag:** the job uses `rancher/shell` (kubectl + sh), which Rancher and Harvester already use. Find a tag present in your environment:
+
+```bash
+use-harvester
+kubectl get pods,jobs -A -o jsonpath='{..image}' | tr ' ' '\n' | grep rancher/shell | sort -u
+# or on a Harvester node:  sudo crictl images | grep rancher/shell
+```
+
+**Apply:**
+```bash
+TAG=<tag-from-above>                         # e.g. v0.x.y
+VMTEST_USER=<rancher-user-id>                # the vm-test user (same subject as its k10-basic binding)
+kubectl apply -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-vm-test-clusterrole.yaml
+sed "s|rancher/shell:<CHANGE_ME>|rancher/shell:$TAG|" 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml | kubectl apply -f -
+sed "s|rancher:<CHANGE_ME>|rancher:$VMTEST_USER|" 05-kasten/rbac/vm-test-restorepoints/k10-rpc-vm-test-binding.yaml | kubectl apply -f -
+kubectl -n kasten-io create job k10-rpc-sync-now --from=cronjob/k10-rpc-sync
+kubectl -n kasten-io logs -f job/k10-rpc-sync-now
+# synced N RestorePointContents of vm-test into clusterrole k10-rpc-vm-test
+```
+
+**Validate:**
+```bash
+kubectl get clusterrole k10-rpc-vm-test -o jsonpath='{.rules[0].resourceNames}{"\n"}'
+# ["k10-rpc-sync-placeholder", "<vm-test rpc names>..."]  - the placeholder must ALWAYS be there
+RPC_VMTEST=$(kubectl get restorepointcontents.apps.kio.kasten.io -l k10.kasten.io/appNamespace=vm-test -o jsonpath='{.items[0].metadata.name}')
+RPC_OTHER=$(kubectl get restorepointcontents.apps.kio.kasten.io -l 'k10.kasten.io/appNamespace!=vm-test' -o jsonpath='{.items[0].metadata.name}')
+kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io/$RPC_VMTEST --as rancher:$VMTEST_USER   # yes
+kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io/$RPC_OTHER  --as rancher:$VMTEST_USER   # no
+kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io             --as rancher:$VMTEST_USER   # no (no blanket grant)
+```
+
+**Validate (dashboard):** log in as the vm-test user. On a vm-test restore point, set an expiry, then delete a test restore point; both must succeed. On another namespace's restore point (if visible), both must be refused. If expiry is still refused, the dashboard needs something beyond `restorepointcontents`. Copy the exact error (it names the verb and resource), plus `kubectl -n kasten-io logs deploy/aggregatedapis-svc --since=10m | grep -i forbidden`, and the role can be extended.
+
 ---
 
 ## Lessons from the first test run
@@ -512,5 +552,7 @@ These cost the most time in the first run. Each is now built into the steps abov
 | `env: 'bash\r': No such file or directory` | CRLF line endings from a Windows checkout | `sed -i 's/\r$//' scripts/*.sh` |
 | `jq: command not found` | jq missing in WSL Fedora | `sudo dnf install -y jq` |
 | Dashboard RBAC pages empty or `forbidden` for the Kasten admin | k10-admin has no RBAC permissions | step 5.5 |
+| vm-test user can't delete or expire a new restore point | the sync job hasn't run since the backup | wait up to 5 min, or `kubectl -n kasten-io create job k10-rpc-sync-now --from=cronjob/k10-rpc-sync` |
+| `k10-rpc-sync` pod `InvalidImageName` / `ErrImagePull` | `rancher/shell` tag not set or not available | step 5.6: pick a tag already in your environment |
 | `denied request: ValidatingAdmissionPolicy 'k10-rbac-guardrail'` | a Kasten user tried to change a non-`k10-*` role or binding | intended; name custom roles `k10-*` |
 | `error: the server doesn't have a resource type "settings"` from `whereami`-style checks | kubeconfig points at the vcluster | step 0.2: rebuild `~/.kube/harvester.yaml` from a node's `rke2.yaml` |

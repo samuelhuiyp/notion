@@ -1,0 +1,24 @@
+# k10-rpc-vm-test: Lets vm-test users delete, and change (e.g. set expiry on), the restore points of namespace vm-test only from the Kasten
+# dashboard on the Harvester cluster. RestorePointContents are cluster-scoped, so the role is limited by resourceNames instead of namespace;
+# the CronJob k10-rpc-sync (k10-rpc-sync.yaml) rewrites the name list every 5 minutes. This file is only the safe starting point (no real
+# names). The placeholder entry must stay: an EMPTY resourceNames list would grant every RestorePointContent in the cluster.
+# Docs: https://docs.kasten.io/latest/api/restorepoints/
+#
+#   kubectl diff   -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-vm-test-clusterrole.yaml
+#   kubectl apply  -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-vm-test-clusterrole.yaml
+#   kubectl get clusterrole k10-rpc-vm-test -o jsonpath='{.rules[0].resourceNames}{"\n"}'
+#   kubectl delete -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-vm-test-clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k10-rpc-vm-test
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+    app.kubernetes.io/managed-by: k10-rpc-sync
+rules:
+  - apiGroups: ["apps.kio.kasten.io"]
+    resources: ["restorepointcontents", "restorepointcontents/details"]
+    verbs: ["get", "update", "patch", "delete"]
+    resourceNames:
+      - "k10-rpc-sync-placeholder"   # never exists; keeps the list non-empty (empty = all names)

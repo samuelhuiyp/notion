@@ -1,0 +1,132 @@
+# k10-rpc-sync: CronJob in kasten-io on the Harvester cluster that every 5 minutes copies the names of all RestorePointContents labelled
+# k10.kasten.io/appNamespace=vm-test into ClusterRole k10-rpc-vm-test (resourceNames), so vm-test users can delete or expire only their own
+# backups. Its ServiceAccount can list RestorePointContents and edit only that one ClusterRole (escalate is name-scoped to it). New backups
+# become manageable after the next run. Set the rancher/shell image tag to one already used in your environment (see runbook 5.6).
+#
+#   kubectl diff   -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml
+#   kubectl apply  -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml
+#   kubectl -n kasten-io create job k10-rpc-sync-now --from=cronjob/k10-rpc-sync && kubectl -n kasten-io logs -f job/k10-rpc-sync-now
+#   kubectl delete -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k10-rpc-sync
+  namespace: kasten-io
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+---
+# What the sync job may do: read restore point contents, and rewrite only ClusterRole k10-rpc-vm-test
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k10-rpc-sync
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+rules:
+  - apiGroups: ["apps.kio.kasten.io"]
+    resources: ["restorepointcontents"]
+    verbs: ["list"]
+  # escalate: write rules the job itself doesn't hold - only for this one role
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["k10-rpc-vm-test"]
+    verbs: ["get", "update", "patch", "escalate"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k10-rpc-sync
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k10-rpc-sync
+subjects:
+  - kind: ServiceAccount
+    name: k10-rpc-sync
+    namespace: kasten-io
+---
+# The sync job itself
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k10-rpc-sync
+  namespace: kasten-io
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: k10-rpc-sync
+        spec:
+          serviceAccountName: k10-rpc-sync
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sync
+              image: rancher/shell:<CHANGE_ME>   # kubectl + sh; pin the tag your environment already uses
+              env:
+                - name: APP_NAMESPACE
+                  value: vm-test
+                - name: ROLE_NAME
+                  value: k10-rpc-vm-test
+                - name: HOME
+                  value: /tmp
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  names=$(kubectl get restorepointcontents.apps.kio.kasten.io \
+                    -l "k10.kasten.io/appNamespace=${APP_NAMESPACE}" \
+                    -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+                  {
+                    printf '%s\n' \
+                      'apiVersion: rbac.authorization.k8s.io/v1' \
+                      'kind: ClusterRole' \
+                      'metadata:' \
+                      "  name: ${ROLE_NAME}" \
+                      '  labels:' \
+                      '    app.kubernetes.io/part-of: k10-rbac' \
+                      '    app.kubernetes.io/managed-by: k10-rpc-sync' \
+                      'rules:' \
+                      '  - apiGroups: ["apps.kio.kasten.io"]' \
+                      '    resources: ["restorepointcontents", "restorepointcontents/details"]' \
+                      '    verbs: ["get", "update", "patch", "delete"]' \
+                      '    resourceNames:' \
+                      '      - "k10-rpc-sync-placeholder"'
+                    for n in $names; do printf '      - "%s"\n' "$n"; done
+                  } | kubectl apply -f -
+                  echo "synced $(printf '%s\n' "$names" | grep -c . || true) RestorePointContents of ${APP_NAMESPACE} into clusterrole ${ROLE_NAME}"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}

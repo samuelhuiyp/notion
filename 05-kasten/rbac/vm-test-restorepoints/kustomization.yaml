@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Apply on Harvester after Kasten. The binding (rancher:<CHANGE_ME>) is applied separately with sed.
+# Re-applying the ClusterRole from Git only resets it to the placeholder (fewer rights, never more)
+# until the next sync run.
+resources:
+  - k10-rpc-vm-test-clusterrole.yaml
+  - k10-rpc-sync.yaml
