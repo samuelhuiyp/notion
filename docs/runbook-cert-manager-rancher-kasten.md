@@ -269,7 +269,8 @@ kubectl -n rancher-vcluster get addons.harvesterhci.io rancher-vcluster -o jsonp
 # The new values must be in the cluster (expect 3 matches: fromHost, tls.source: secret, privateCA):
 kubectl -n rancher-vcluster get addons.harvesterhci.io rancher-vcluster -o jsonpath='{.spec.valuesContent}' \
   | grep -cE 'fromHost:|ingress.tls.source: secret|privateCA: "true"'
-# A NEW install job must have run after your apply (AGE in minutes, not hours):
+# On a first apply or a values change, a NEW install job runs (AGE in minutes). Re-applying the same values
+# starts no job; old pods are then expected, and step 3.2 is the real check:
 kubectl -n rancher-vcluster get pods | grep -E 'helm-install-rancher|rancher-vcluster-0'
 kubectl -n rancher-vcluster get pods                 # rancher-vcluster-0 Running; rancher-*-x-cattle-system-x-* pods Running
 kubectl -n rancher-vcluster logs statefulset/rancher-vcluster -c syncer --tail=50 | grep -i -E 'secret|error' | tail -10
@@ -447,7 +448,7 @@ These cost the most time in the first run. Each is now built into the steps abov
 3. **Match Harvester's own ingress controller.** This Harvester runs Traefik, not rke2-ingress-nginx. With `class: nginx`, the Kasten ingress had no ADDRESS and `kasten.ct.local` didn't load. Check `rancher-expose` (step 0.3).
 4. **Don't name the client secret `k10-oidc-auth`.** The Kasten chart creates its own Secret with that name, so the install fails with `exists and cannot be imported`. The repo uses `kasten-oidc-client`.
 5. **Use the full resource name `addons.harvesterhci.io`.** Plain `addon` resolves to RKE2's `addons.k3s.cattle.io` and returns NotFound.
-6. **Confirm the add-on change rolled out.** After step 3.1, the install jobs in `rancher-vcluster` must be minutes old, not hours. Old jobs mean Rancher is still on its old certificate, and Kasten's login fails because Rancher's certificate isn't from the ct.local CA.
+6. **Judge the add-on by its values and certificate, not pod age.** Re-applying unchanged values starts no new install job, so hours-old pods are normal on a re-run. What matters is the values check in 3.1 (3 matches) and Rancher serving the ct.local certificate in 3.2. If it doesn't, Kasten's login fails.
 7. **Windows checkouts break the scripts.** CRLF line endings cause `env: 'bash\r': No such file or directory`. Run `git config core.autocrlf input` and `sed -i 's/\r$//' scripts/*.sh` (step 0.1).
 8. **The EULA is accepted in the dashboard, not at install.** The chart no longer sets `eula`, so the first login asks for it (step 5.3).
 
@@ -465,7 +466,7 @@ These cost the most time in the first run. Each is now built into the steps abov
 | Rancher error page: `invalid redirect_uri` | callback URL mismatch | compare Rancher's error with `spec.redirectURIs` (4.2), and tell Claude the URL Kasten sent |
 | `kasten.ct.local` → 404, or `k10-ingress` has no ADDRESS | ingress class differs from Harvester's controller | step 0.3; CLASS must match `rancher-expose` |
 | `addons.k3s.cattle.io "rancher-vcluster" not found` | kubectl's short name `addon` picked RKE2's resource | use `addons.harvesterhci.io` |
-| Pods in `rancher-vcluster` all hours old after step 3.1 | add-on change not applied or not rolled out | 3.1 checks: values grep = 3; then re-apply |
+| Pods in `rancher-vcluster` all hours old after step 3.1 | expected if the same values were already applied; otherwise the change didn't roll out | values grep = 3 and step 3.2 passes → fine; grep < 3 → re-apply 3.1 |
 | Helm job: `exists and cannot be imported into the current release` | leftovers from an earlier attempt | step 0.4, then re-run 1.3 and onwards |
 | Same error naming `Secret "k10-oidc-auth"` | client secret given the chart's reserved name | delete it; recreate as `kasten-oidc-client` (step 5.1) |
 | Kasten pods running but `cannot resolve rancher.ct.local`, and `whereami` → RANCHER | Kasten installed inside the vcluster | step 0.4 (remove it there), then 5.2 with `use-harvester` |
