@@ -1,0 +1,28 @@
+# k10-rbac-managers: Gives the Kasten user rancher:<CHANGE_ME> (Rancher user ID as Kasten sees it via OIDC, the same value as k10AdminUsers in
+# 05-kasten/k10-helmchart.yaml) the k10-rbac-manager ClusterRole on the Harvester cluster. The user also needs k10-admin, which the Kasten
+# chart already grants through k10AdminUsers. Replace <CHANGE_ME> at apply time with sed, as in the runbook; don't commit the real ID.
+# Docs: https://docs.kasten.io/latest/access/rbac/
+#
+#   sed "s|rancher:<CHANGE_ME>|rancher:$ADMIN|" 05-kasten/rbac/k10-rbac-manager-binding.yaml | kubectl diff  -f -
+#   sed "s|rancher:<CHANGE_ME>|rancher:$ADMIN|" 05-kasten/rbac/k10-rbac-manager-binding.yaml | kubectl apply -f -
+#   kubectl auth can-i create clusterrolebindings --as "rancher:$ADMIN"        # yes
+#   kubectl delete -f 05-kasten/rbac/k10-rbac-manager-binding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k10-rbac-managers
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k10-rbac-manager
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: "rancher:<CHANGE_ME>"
+    # Once the "groups" claim format is confirmed, prefer a group, e.g.:
+    # - apiGroup: rbac.authorization.k8s.io
+    #   kind: Group
+    #   name: "rancher:azuread_group://f5644315-9653-43c3-b239-41cab3792871"

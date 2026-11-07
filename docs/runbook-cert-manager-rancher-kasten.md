@@ -437,6 +437,46 @@ kubectl apply -k 05-kasten
 kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kasten.io
 ```
 
+### 5.5 Let a Kasten admin manage Kasten RBAC from the dashboard
+
+`k10-admin` has no permissions on Kubernetes RBAC, so the dashboard's roles and bindings pages are read-only or refused for it. The files in `05-kasten/rbac/` add, on Harvester:
+- **`k10-rbac-manager` ClusterRole:** view and manage roles and bindings; `bind` only Kasten's built-in roles; no `escalate`.
+- **`k10-rbac-managers` ClusterRoleBinding** for the Kasten admin user.
+- **`k10-rbac-guardrail` ValidatingAdmissionPolicy:** Kasten dashboard users (`rancher:*`) may only change `k10-*` roles and bindings to `k10-*` roles.
+
+```bash
+use-harvester
+kubectl api-resources | grep -c validatingadmissionpolicies     # >= 1 (Kubernetes 1.30+)
+ADMIN=<rancher-user-id-from-4.3>
+kubectl apply -k 05-kasten/rbac
+sed "s|rancher:<CHANGE_ME>|rancher:$ADMIN|" 05-kasten/rbac/k10-rbac-manager-binding.yaml | kubectl apply -f -
+```
+
+**Validate (RBAC):**
+```bash
+kubectl auth can-i list clusterrolebindings --as "rancher:$ADMIN"            # yes
+kubectl auth can-i bind clusterroles/k10-basic --as "rancher:$ADMIN"         # yes
+kubectl auth can-i bind clusterroles/cluster-admin --as "rancher:$ADMIN"     # no
+kubectl auth can-i escalate clusterroles --as "rancher:$ADMIN"               # no
+```
+
+**Validate (guardrail; dry-run, changes nothing):**
+```bash
+kubectl delete clusterrolebinding cluster-admin --dry-run=server --as "rancher:$ADMIN"
+# Error ... denied request: ValidatingAdmissionPolicy 'k10-rbac-guardrail' ... only manage bindings to k10-* roles
+kubectl create rolebinding k10-test --clusterrole=k10-basic --user=rancher:test -n default --dry-run=server --as "rancher:$ADMIN"
+# rolebinding.rbac.authorization.k8s.io/k10-test created (server dry run)
+```
+
+**Validate (dashboard):** log in to Kasten as `$ADMIN`. Open the RBAC pages under Settings, and create, then delete, a test binding of `k10-basic` to a test user in an application namespace. Then confirm who made the change:
+
+```bash
+kubectl get validatingadmissionpolicy k10-rbac-guardrail
+kubectl get rolebinding -A -o json | jq -r '.items[] | select(.roleRef.name=="k10-basic") | .metadata.namespace + "/" + .metadata.name'
+```
+
+The guardrail only applies if the dashboard makes changes **as the logged-in user**. To confirm, try to bind a non-Kasten role, such as `view`, from the dashboard. It must be refused, by either Kubernetes RBAC or the guardrail. If it succeeds, the dashboard is acting as Kasten's own service account; stop and report it.
+
 ---
 
 ## Lessons from the first test run
@@ -472,4 +512,6 @@ These cost the most time in the first run. Each is now built into the steps abov
 | Kasten pods running but `cannot resolve rancher.ct.local`, and `whereami` → RANCHER | Kasten installed inside the vcluster | step 0.4 (remove it there), then 5.2 with `use-harvester` |
 | `env: 'bash\r': No such file or directory` | CRLF line endings from a Windows checkout | `sed -i 's/\r$//' scripts/*.sh` |
 | `jq: command not found` | jq missing in WSL Fedora | `sudo dnf install -y jq` |
+| Dashboard RBAC pages empty or `forbidden` for the Kasten admin | k10-admin has no RBAC permissions | step 5.5 |
+| `denied request: ValidatingAdmissionPolicy 'k10-rbac-guardrail'` | a Kasten user tried to change a non-`k10-*` role or binding | intended; name custom roles `k10-*` |
 | `error: the server doesn't have a resource type "settings"` from `whereami`-style checks | kubeconfig points at the vcluster | step 0.2: rebuild `~/.kube/harvester.yaml` from a node's `rke2.yaml` |

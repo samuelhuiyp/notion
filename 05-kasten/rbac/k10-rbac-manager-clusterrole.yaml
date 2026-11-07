@@ -1,0 +1,36 @@
+# k10-rbac-manager: Lets a Kasten administrator view and manage Kasten RBAC (Roles, ClusterRoles, RoleBindings, ClusterRoleBindings) from
+# the Kasten dashboard on the Harvester cluster. It can bind only Kasten's built-in roles and has no "escalate" verb, so new roles can't
+# exceed what the user already holds (k10-admin). Limiting changes to k10-* objects is enforced by k10-rbac-guardrail-vap.yaml.
+# Docs: https://docs.kasten.io/latest/access/rbac/
+#
+#   kubectl diff   -f 05-kasten/rbac/k10-rbac-manager-clusterrole.yaml
+#   kubectl apply  -f 05-kasten/rbac/k10-rbac-manager-clusterrole.yaml
+#   kubectl auth can-i bind clusterroles/k10-basic --as "rancher:<user-id>"      # yes (once bound)
+#   kubectl delete -f 05-kasten/rbac/k10-rbac-manager-clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k10-rbac-manager
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+rules:
+  # Dashboard view of RBAC resources (the read-only example from the Kasten docs)
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+    verbs: ["get", "list", "watch"]
+  # Manage roles and bindings. Kubernetes still blocks creating a role with permissions the user doesn't hold
+  # (no "escalate"), and the guardrail policy limits writes to k10-* objects.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+    verbs: ["create", "update", "patch", "delete"]
+  # Bind Kasten's built-in roles, including ones whose permissions the manager doesn't hold itself (e.g. k10-ns-admin).
+  # Names follow the Helm release "k10" (chart 9.0.8). Custom k10-* roles need no entry: they can't exceed k10-admin.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames: ["k10-admin", "k10-basic", "k10-config-view", "k10-mc-admin", "k10-virtualmachines-admin"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["bind"]
+    resourceNames: ["k10-ns-admin"]
