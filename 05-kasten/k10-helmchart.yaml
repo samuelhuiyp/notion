@@ -63,8 +63,9 @@ spec:
 
     ingress:
       create: true
-      # Must match an existing IngressClass name (kubectl get ingressclass). Harvester itself ships
-      # rke2-ingress-nginx, not Traefik: Traefik must be installed and reachable on its own IP.
+      # Same controller as Harvester's own UI (cattle-system/rancher-expose) and the synced Rancher
+      # ingress: Traefik on the Harvester VIP. kasten.ct.local shares 443 with rancher.ct.local by hostname.
+      # Older Harvester releases use rke2-ingress-nginx instead: check `kubectl get ingress -A`.
       class: traefik
       host: kasten.ct.local
       urlPath: k10

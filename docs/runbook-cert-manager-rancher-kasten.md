@@ -79,20 +79,21 @@ From here, each block starts with `use-harvester` or `use-rancher`. Run `wheream
 
 ### 0.3 Decide Kasten's ingress class and find the IPs
 
-`05-kasten/k10-helmchart.yaml` currently says `class: traefik`. That only works if a Traefik controller on **Harvester** watches Harvester's Ingresses. Traefik running *inside* the vcluster only watches the vcluster.
+Kasten must use the same ingress controller as Harvester's own UI. Which one that is depends on the Harvester release: newer ones use Traefik, older ones rke2-ingress-nginx.
 
 ```bash
 use-harvester
-kubectl get ingressclass
-kubectl get pods -A | grep -i traefik
-kubectl -n kube-system get svc ingress-expose -o wide         # Harvester's own ingress (nginx) IP
-kubectl get svc -A | grep -i traefik                          # Traefik's IP, if any
+kubectl get ingress -A
 ```
 
-| What you see | `ingress.class` for Kasten | `kasten.ct.local` must resolve to |
+Look at the `CLASS` and `ADDRESS` of `cattle-system/rancher-expose` (Harvester's own UI):
+
+| `rancher-expose` CLASS | `ingress.class` for Kasten | `kasten.ct.local` must resolve to |
 |---|---|---|
-| A `traefik` IngressClass on Harvester, and the Traefik pod in a namespace **other than** `rancher-vcluster` | `traefik` (as committed) | Traefik's IP (same as `rancher.ct.local`) |
-| Traefik only in `rancher-vcluster`, with a name like `traefik-…-x-kube-system-x-rancher-vcluster` | `nginx` | `ingress-expose` IP |
+| `traefik` (your lab, Harvester at 192.168.1.60) | `traefik` (as committed) | its ADDRESS, the same IP as `rancher.ct.local` |
+| `nginx` | `nginx` | its ADDRESS |
+
+Rancher and Kasten then share port 443 on one IP, routed by hostname.
 
 Write down the two IPs:
 - **`RANCHER_IP`:** where `rancher.ct.local` points today (`getent hosts rancher.ct.local`, or your hosts file).
@@ -439,7 +440,7 @@ kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kaste
 | auth-svc: `x509: certificate signed by unknown authority` | Kasten doesn't trust the CA | step 1.4 ConfigMap, then `kubectl -n kasten-io rollout restart deploy/auth-svc` |
 | auth-svc: `.../k10-oidc-auth-creds/client-id: no such file` | wrong or missing client secret | step 5.1; `clientSecretName` must be `kasten-oidc-client` |
 | Rancher error page: `invalid redirect_uri` | callback URL mismatch | compare Rancher's error with `spec.redirectURIs` (4.2), and tell Claude the URL Kasten sent |
-| `kasten.ct.local` → 404 from the ingress | wrong ingress class or IP | step 0.3 table; `kubectl -n kasten-io get ingress -o wide` |
+| `kasten.ct.local` → 404, or `k10-ingress` has no ADDRESS | ingress class differs from Harvester's controller | step 0.3; CLASS must match `rancher-expose` |
 | `addons.k3s.cattle.io "rancher-vcluster" not found` | kubectl's short name `addon` picked RKE2's resource | use `addons.harvesterhci.io` |
 | Pods in `rancher-vcluster` all hours old after step 3.1 | add-on change not applied or not rolled out | 3.1 checks: values grep = 3; then re-apply |
 | Helm job: `exists and cannot be imported into the current release` | leftovers from an earlier attempt | step 0.4, then re-run 1.3 and onwards |
