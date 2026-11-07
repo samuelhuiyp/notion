@@ -539,6 +539,26 @@ kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io             --
 
 **Validate (dashboard):** log in as the vm-test user. On a vm-test restore point, set an expiry, then delete a test restore point; both must succeed. On another namespace's restore point (if visible), both must be refused. If expiry is still refused, the dashboard needs something beyond `restorepointcontents`. Copy the exact error (it names the verb and resource), plus `kubectl -n kasten-io logs deploy/aggregatedapis-svc --since=10m | grep -i forbidden`, and the role can be extended.
 
+### 5.7 Read-only role for the Kasten namespace
+
+`k10-ns-view` is a read-only copy of Kasten's `k10-ns-admin` Role in `kasten-io`: same resources, only `get`/`list`/`watch`, and **no secrets**. It's applied with `kubectl apply -k 05-kasten/rbac`. Grant it either from the Kasten dashboard as `user-6hc67`, or with:
+
+```bash
+use-harvester
+VIEW_USER=<rancher-user-id>
+sed "s|rancher:<CHANGE_ME>|rancher:$VIEW_USER|" 05-kasten/rbac/k10-ns-view-binding.yaml | kubectl apply -f -
+```
+
+**Validate:**
+```bash
+kubectl auth can-i list pods        -n kasten-io --as rancher:$VIEW_USER   # yes
+kubectl auth can-i delete pods      -n kasten-io --as rancher:$VIEW_USER   # no
+kubectl auth can-i get secrets      -n kasten-io --as rancher:$VIEW_USER   # no
+kubectl auth can-i update configmaps -n kasten-io --as rancher:$VIEW_USER  # no
+```
+
+For a read-only view of Kasten's configuration (profiles, policies) in the dashboard, also bind Kasten's built-in `k10-config-view` ClusterRole.
+
 ---
 
 ## Lessons from the first test run

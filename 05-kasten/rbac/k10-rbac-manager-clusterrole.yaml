@@ -33,4 +33,4 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles"]
     verbs: ["bind"]
-    resourceNames: ["k10-ns-admin"]
+    resourceNames: ["k10-ns-admin", "k10-ns-view"]

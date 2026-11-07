@@ -5,3 +5,4 @@ resources:
   - k10-rbac-guardrail-vap.yaml
   - k10-rbac-manager-clusterrole.yaml
   - k10-rbac-manager-binding.yaml
+  - k10-ns-view-role.yaml          # its binding (placeholder user) is applied with sed
