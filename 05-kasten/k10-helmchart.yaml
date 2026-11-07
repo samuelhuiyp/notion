@@ -1,5 +1,5 @@
 # k10: Installs Veeam Kasten on the Harvester cluster itself (namespace kasten-io, via RKE2 helm-controller), NOT inside Rancher. UI at
-# https://kasten.ct.local/k10 with the cert-manager Secret kasten-io/wildcard-ct-local-tls. Users log in through Rancher's OIDC provider
+# https://kasten.ct.local/k10 through the Traefik ingress with the cert-manager Secret kasten-io/wildcard-ct-local-tls. Users log in through Rancher's OIDC provider
 # (https://rancher.ct.local/oidc) with client credentials from kasten-io/kasten-oidc-client; Kasten trusts the ct.local CA through ConfigMap
 # kasten-io/custom-ca-bundle-store. Set the admin user (<CHANGE_ME>) before applying; then apply 05-kasten (profiles, policies).
 #
@@ -22,10 +22,8 @@ spec:
   targetNamespace: kasten-io
   createNamespace: true
   valuesContent: |-
-    eula:
-      accept: true                  # accepting the EULA is a decision for your org - review it
-      company: "Example Corp"
-      email: "platform-team@corp.example.com"
+    # No eula block: eula.accept defaults to false, so Kasten asks for EULA acceptance in the
+    # dashboard on first login instead of at install time.
     clusterName: harvester-prod
 
     # Trust the private ct.local CA (needed to call https://rancher.ct.local/oidc).
@@ -65,7 +63,9 @@ spec:
 
     ingress:
       create: true
-      class: nginx                  # Harvester's rke2-ingress-nginx
+      # Must match an existing IngressClass name (kubectl get ingressclass). Harvester itself ships
+      # rke2-ingress-nginx, not Traefik: Traefik must be installed and reachable on its own IP.
+      class: traefik
       host: kasten.ct.local
       urlPath: k10
       tls:
