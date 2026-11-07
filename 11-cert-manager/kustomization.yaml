@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Order on a fresh cluster (CRDs must exist before the Certificate kinds):
+#   1. kubectl apply -f cert-manager-helmchart.yaml   (wait for the webhook)
+#   2. kubectl apply -f ct-local-ca.yaml
+#   3. after namespaces rancher-vcluster and kasten-io exist: wildcard-ct-local-certificates.yaml
+#   4. scripts/publish-ct-local-ca.sh
+# Once installed, `kubectl apply -k 11-cert-manager` re-applies everything idempotently.
+resources:
+  - cert-manager-helmchart.yaml
+  - ct-local-ca.yaml
+  - wildcard-ct-local-certificates.yaml

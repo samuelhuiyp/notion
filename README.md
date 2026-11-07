@@ -21,11 +21,14 @@ docs/                              assumptions, network design, storage design, 
 03-storage-classes/                performance/capacity tiers (Longhorn, NetApp, NFS, Portworx),
                                    Longhorn settings, VolumeSnapshotClasses, csi-driver-config
 04-portworx/                       Portworx StorageCluster
-05-kasten/                         Kasten Helm values, location profiles, tiered policies
-06-rancher/                        Rancher server values, Harvester import, RKE2 guest clusters
+05-kasten/                         Kasten HelmChart (OIDC via Rancher, kasten.ct.local), profiles, tiered policies
+06-rancher/                        Rancher vcluster add-on (rancher.ct.local), Harvester import, guest clusters
+09-rancher-sso/                    Rancher auth: Entra ID login, OIDC provider + Kasten OIDC client
+10-rancher-rbac/                   Rancher role templates and bindings
+11-cert-manager/                   cert-manager, ct.local root CA, *.ct.local certificates
 07-optimisation/                   platform settings, sysctl, KSM, addons, migration tuning, VM profiles
 08-overcommit/                     overcommit ratios, namespace quotas
-scripts/                           validate, label nodes, tag disks
+scripts/                           validate, label nodes, tag disks, publish CA, sync Kasten OIDC secret
 ```
 
 Directories are numbered in apply order. Each Kubernetes stage has a `kustomization.yaml`. Helm values, install configs, examples and secret templates are deliberately left out of the kustomizations.
@@ -44,7 +47,12 @@ Directories are numbered in apply order. Each Kubernetes stage has a `kustomizat
 | 6 | Storage classes | `kubectl apply -k 03-storage-classes` (drop `portworx.yaml` if step 5 skipped), un-default `harvester-longhorn` |
 | 7 | Optimisation | `kubectl apply -k 07-optimisation`, `kubectl patch` addons and KubeVirt per file headers |
 | 8 | Overcommit + quotas | `kubectl apply -k 08-overcommit` |
-| 9 | Kasten | `helm install` with values, secrets, `kubectl apply -k 05-kasten` |
+| 9a | cert-manager + ct.local CA (Harvester) | `kubectl apply -f 11-cert-manager/cert-manager-helmchart.yaml`, wait for the webhook, then `kubectl apply -f 11-cert-manager/ct-local-ca.yaml` |
+| 9b | Namespaces for the certificates | `kubectl apply -f 06-rancher/vcluster-addon/rancher-addon.yaml` (bootstrap password set) and `kubectl apply -f 05-kasten/k10-helmchart.yaml` (version + admin set) |
+| 9c | *.ct.local certificates + CA publishing | `kubectl apply -f 11-cert-manager/wildcard-ct-local-certificates.yaml`, then `scripts/publish-ct-local-ca.sh`; import `ct-local-root-ca.crt` on workstations |
+| 9d | Rancher OIDC provider (Rancher context) | `kubectl apply -f 09-rancher-sso/oidc-provider-feature.yaml`, then `09-rancher-sso/oidc-client-kasten.yaml` |
+| 9e | Kasten OIDC credentials | `scripts/sync-kasten-oidc-secret.sh`; restart Kasten auth: `kubectl -n kasten-io rollout restart deploy/auth-svc` |
+| 9f | Kasten profiles and policies | secrets from `05-kasten/secrets/*.example.yaml`, then `kubectl apply -k 05-kasten` |
 | 10 | Rancher | Import Harvester (`06-rancher/harvester-import`), then guest clusters |
 | 11 | Validate | `docs/review-notes.md` → *Validation before production* |
 

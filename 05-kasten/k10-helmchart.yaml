@@ -1,0 +1,92 @@
+# k10: Installs Veeam Kasten on the Harvester cluster itself (namespace kasten-io, via RKE2 helm-controller), NOT inside Rancher. UI at
+# https://kasten.ct.local/k10 with the cert-manager Secret kasten-io/wildcard-ct-local-tls. Users log in through Rancher's OIDC provider
+# (https://rancher.ct.local/oidc) with client credentials from kasten-io/k10-oidc-auth; Kasten trusts the ct.local CA through ConfigMap
+# kasten-io/custom-ca-bundle-store. Set the admin user (<CHANGE_ME>) before applying; then apply 05-kasten (profiles, policies).
+#
+#   kubectl diff   -f 05-kasten/k10-helmchart.yaml
+#   kubectl apply  -f 05-kasten/k10-helmchart.yaml
+#   curl --cacert ct-local-root-ca.crt -sS -o /dev/null -w '%{http_code}\n' https://kasten.ct.local/k10/
+#   kubectl delete -f 05-kasten/k10-helmchart.yaml
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: k10
+  namespace: kube-system
+spec:
+  repo: https://charts.kasten.io/
+  chart: k10
+  # 9.0.8 (2026-10-19): values in this file were checked against this chart's values.schema.json and templates.
+  # Confirm Kasten's support matrix lists your Harvester release before upgrading.
+  version: "9.0.8"
+  targetNamespace: kasten-io
+  createNamespace: true
+  valuesContent: |-
+    eula:
+      accept: true                  # accepting the EULA is a decision for your org - review it
+      company: "Example Corp"
+      email: "platform-team@corp.example.com"
+    clusterName: harvester-prod
+
+    # Trust the private ct.local CA (needed to call https://rancher.ct.local/oidc).
+    # ConfigMap key custom-ca-bundle.pem, created by scripts/publish-ct-local-ca.sh.
+    cacertconfigmap:
+      name: custom-ca-bundle-store
+
+    auth:
+      tokenAuth:
+        enabled: false
+      oidcAuth:
+        enabled: true
+        providerURL: https://rancher.ct.local/oidc
+        redirectURL: https://kasten.ct.local      # Kasten appends /k10/auth-svc/v0/oidc/redirect (= OIDCClient redirectURIs)
+        scopes: "openid profile"
+        clientSecretName: k10-oidc-auth           # keys client-id, client-secret (scripts/sync-kasten-oidc-secret.sh)
+        usernameClaim: sub
+        usernamePrefix: "rancher:"
+        groupClaim: groups
+        groupPrefix: "rancher:"
+        pkceRequired: true                        # Rancher's OIDC provider only accepts PKCE S256
+      # Gets the k10-admin role. Value = usernamePrefix + the user's "sub" claim as Rancher issues it.
+      k10AdminUsers:
+        - "rancher:<CHANGE_ME>"
+      # k10AdminGroups:                         # once the groups claim format is confirmed, e.g. the Entra group from 09-rancher-sso
+      #   - "rancher:azuread_group://f5644315-9653-43c3-b239-41cab3792871"
+
+    global:
+      persistence:
+        enabled: true
+        storageClass: harvester-longhorn   # exists on every Harvester cluster (lh-capacity needs tagged disks)
+        size: 20Gi
+        catalog:
+          size: 50Gi
+
+    ingress:
+      create: true
+      class: nginx                  # Harvester's rke2-ingress-nginx
+      host: kasten.ct.local
+      urlPath: k10
+      tls:
+        enabled: true
+        secretName: wildcard-ct-local-tls
+
+    prometheus:
+      server:
+        enabled: true
+
+    # Do not try to back up Harvester/K8s system namespaces as "apps".
+    excludedApps:
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - harvester-system
+      - longhorn-system
+      - cattle-system
+      - cattle-fleet-system
+      - cattle-monitoring-system
+      - cattle-logging-system
+      - fleet-local
+      - local
+      - trident
+      - portworx
+      - cert-manager

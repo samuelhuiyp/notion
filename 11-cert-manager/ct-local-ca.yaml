@@ -1,0 +1,50 @@
+# ct-local-ca: Creates the private root CA "ct.local Root CA" (10 years, renewed 90 days before expiry) and the ClusterIssuer ct-local-ca that
+# signs every *.ct.local certificate on the Harvester cluster. The CA key pair is the Secret cert-manager/ct-local-root-ca. Workstations and
+# services trust this CA once; leaf certificates can then renew without anyone re-importing anything. Apply with the Harvester kubeconfig.
+# Docs: https://cert-manager.io/docs/configuration/selfsigned/#bootstrapping-ca-issuers
+#
+#   kubectl diff   -f 11-cert-manager/ct-local-ca.yaml
+#   kubectl apply  -f 11-cert-manager/ct-local-ca.yaml
+#   kubectl get clusterissuer ct-local-ca -o jsonpath='{.status.conditions[0].type}={.status.conditions[0].status}{"\n"}'
+#   kubectl delete -f 11-cert-manager/ct-local-ca.yaml
+
+# Bootstrap issuer: only used to self-sign the root CA below.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+spec:
+  selfSigned: {}
+---
+# Root CA certificate. Renewal re-signs it with the SAME key (rotationPolicy Never), so clients that already trust it keep working.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ct-local-root-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: ct.local Root CA
+  subject:
+    organizations:
+      - ct.local
+  duration: 87600h        # 10 years
+  renewBefore: 2160h      # 90 days
+  secretName: ct-local-root-ca
+  privateKey:
+    algorithm: RSA
+    size: 4096
+    rotationPolicy: Never
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+# CA issuer used by all *.ct.local certificates. A ClusterIssuer reads its CA secret from the cert-manager namespace.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ct-local-ca
+spec:
+  ca:
+    secretName: ct-local-root-ca
