@@ -251,7 +251,13 @@ unset RB
 
 **Validate (Harvester side):**
 ```bash
-kubectl -n rancher-vcluster get addon rancher-vcluster -o jsonpath='{.spec.enabled} {.status.status}{"\n"}'
+# Use the full name: on Harvester, plain "addon" resolves to RKE2's addons.k3s.cattle.io.
+kubectl -n rancher-vcluster get addons.harvesterhci.io rancher-vcluster -o jsonpath='{.spec.enabled} {.status.status}{"\n"}'
+# The new values must be in the cluster (expect 3 matches: fromHost, tls.source: secret, privateCA):
+kubectl -n rancher-vcluster get addons.harvesterhci.io rancher-vcluster -o jsonpath='{.spec.valuesContent}' \
+  | grep -cE 'fromHost:|ingress.tls.source: secret|privateCA: "true"'
+# A NEW install job must have run after your apply (AGE in minutes, not hours):
+kubectl -n rancher-vcluster get pods | grep -E 'helm-install-rancher|rancher-vcluster-0'
 kubectl -n rancher-vcluster get pods                 # rancher-vcluster-0 Running; rancher-*-x-cattle-system-x-* pods Running
 kubectl -n rancher-vcluster logs statefulset/rancher-vcluster -c syncer --tail=50 | grep -i -E 'secret|error' | tail -10
 ```
@@ -434,4 +440,6 @@ kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kaste
 | auth-svc: `.../k10-oidc-auth-creds/client-id: no such file` | wrong or missing client secret | step 5.1; `clientSecretName` must be `kasten-oidc-client` |
 | Rancher error page: `invalid redirect_uri` | callback URL mismatch | compare Rancher's error with `spec.redirectURIs` (4.2), and tell Claude the URL Kasten sent |
 | `kasten.ct.local` → 404 from the ingress | wrong ingress class or IP | step 0.3 table; `kubectl -n kasten-io get ingress -o wide` |
+| `addons.k3s.cattle.io "rancher-vcluster" not found` | kubectl's short name `addon` picked RKE2's resource | use `addons.harvesterhci.io` |
+| Pods in `rancher-vcluster` all hours old after step 3.1 | add-on change not applied or not rolled out | 3.1 checks: values grep = 3; then re-apply |
 | Helm job: `exists and cannot be imported into the current release` | leftovers from an earlier attempt | step 0.4, then re-run 1.3 and onwards |
