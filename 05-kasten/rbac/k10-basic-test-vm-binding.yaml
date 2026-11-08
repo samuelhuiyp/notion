@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: k10-basic
+  namespace: test-vm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k10-basic
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: rancher:m-66rfb
