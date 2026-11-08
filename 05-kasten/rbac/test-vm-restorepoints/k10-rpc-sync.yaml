@@ -1,12 +1,12 @@
 # k10-rpc-sync: CronJob in kasten-io on the Harvester cluster that every 5 minutes copies the names of all RestorePointContents labelled
-# k10.kasten.io/appNamespace=vm-test into ClusterRole k10-rpc-vm-test (resourceNames), so vm-test users can delete or expire only their own
+# k10.kasten.io/appNamespace=test-vm into ClusterRole k10-rpc-test-vm (resourceNames), so test-vm users can delete or expire only their own
 # backups. Its ServiceAccount can list RestorePointContents and edit only that one ClusterRole (escalate is name-scoped to it). New backups
 # become manageable after the next run. Set the rancher/shell image tag to one already used in your environment (see runbook 5.6).
 #
-#   kubectl diff   -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml
-#   kubectl apply  -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml
+#   kubectl diff   -f 05-kasten/rbac/test-vm-restorepoints/k10-rpc-sync.yaml
+#   kubectl apply  -f 05-kasten/rbac/test-vm-restorepoints/k10-rpc-sync.yaml
 #   kubectl -n kasten-io create job k10-rpc-sync-now --from=cronjob/k10-rpc-sync && kubectl -n kasten-io logs -f job/k10-rpc-sync-now
-#   kubectl delete -f 05-kasten/rbac/vm-test-restorepoints/k10-rpc-sync.yaml
+#   kubectl delete -f 05-kasten/rbac/test-vm-restorepoints/k10-rpc-sync.yaml
 
 apiVersion: v1
 kind: ServiceAccount
@@ -16,7 +16,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: k10-rbac
 ---
-# What the sync job may do: read restore point contents, and rewrite only ClusterRole k10-rpc-vm-test
+# What the sync job may do: read restore point contents, and rewrite only ClusterRole k10-rpc-test-vm
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -30,7 +30,7 @@ rules:
   # escalate: write rules the job itself doesn't hold - only for this one role
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles"]
-    resourceNames: ["k10-rpc-vm-test"]
+    resourceNames: ["k10-rpc-test-vm"]
     verbs: ["get", "update", "patch", "escalate"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -83,9 +83,9 @@ spec:
               image: rancher/shell:<CHANGE_ME>   # kubectl + sh; pin the tag your environment already uses
               env:
                 - name: APP_NAMESPACE
-                  value: vm-test
+                  value: test-vm
                 - name: ROLE_NAME
-                  value: k10-rpc-vm-test
+                  value: k10-rpc-test-vm
                 - name: HOME
                   value: /tmp
               command: ["/bin/sh", "-c"]
