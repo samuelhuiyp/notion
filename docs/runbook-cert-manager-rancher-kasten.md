@@ -513,9 +513,7 @@ Known limits of this choice:
 
 ```bash
 use-harvester
-kubectl apply -f 05-kasten/rbac/namespace-bindings/k10-basic-test-vm-binding.yaml
-kubectl apply -f 05-kasten/rbac/roles/k10-retorecontent-manage-role.yaml
-kubectl apply -f 05-kasten/rbac/cluster-bindings/k10-manage-restorecontent-binding.yaml
+kubectl apply -k 05-kasten/rbac        # includes the three files above
 ```
 
 **Validate:**
