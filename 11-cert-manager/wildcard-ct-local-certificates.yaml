@@ -1,0 +1,68 @@
+# wildcard-ct-local: Issues the *.ct.local server certificate (10 years, auto-renewed 90 days before expiry by cert-manager) from ClusterIssuer
+# ct-local-ca into two Secrets on the Harvester cluster: rancher-vcluster/wildcard-ct-local-tls (synced into the Rancher vcluster as
+# cattle-system/tls-rancher-ingress) and kasten-io/wildcard-ct-local-tls (Kasten ingress). An Ingress can only use a Secret in its own
+# namespace, hence one Certificate per namespace. Both namespaces must exist first (created by the Rancher add-on and the Kasten HelmChart).
+# Docs: https://cert-manager.io/docs/usage/certificate/
+#
+#   kubectl diff   -f 11-cert-manager/wildcard-ct-local-certificates.yaml
+#   kubectl apply  -f 11-cert-manager/wildcard-ct-local-certificates.yaml
+#   kubectl get certificate -A -l app.kubernetes.io/part-of=ct-local-pki
+#   kubectl delete -f 11-cert-manager/wildcard-ct-local-certificates.yaml
+
+# Copy for Rancher (host side of the rancher-vcluster add-on)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-ct-local
+  namespace: rancher-vcluster
+  labels:
+    app.kubernetes.io/part-of: ct-local-pki
+spec:
+  secretName: wildcard-ct-local-tls
+  commonName: "*.ct.local"
+  dnsNames:
+    - "*.ct.local"
+    - ct.local
+  duration: 87600h        # 10 years, as required. Apple clients reject server certs valid > 825 days: use 8760h (1 year) if Macs/iPhones connect
+  renewBefore: 2160h      # 90 days
+  privateKey:
+    algorithm: RSA        # widest client compatibility
+    size: 2048
+    rotationPolicy: Always
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  issuerRef:
+    name: ct-local-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+# Copy for Kasten
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-ct-local
+  namespace: kasten-io
+  labels:
+    app.kubernetes.io/part-of: ct-local-pki
+spec:
+  secretName: wildcard-ct-local-tls
+  commonName: "*.ct.local"
+  dnsNames:
+    - "*.ct.local"
+    - ct.local
+  duration: 87600h
+  renewBefore: 2160h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+    rotationPolicy: Always
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  issuerRef:
+    name: ct-local-ca
+    kind: ClusterIssuer
+    group: cert-manager.io

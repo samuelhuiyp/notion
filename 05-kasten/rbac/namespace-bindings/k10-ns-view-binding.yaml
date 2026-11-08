@@ -1,0 +1,24 @@
+# k10-ns-view: Binds the read-only k10-ns-view Role in kasten-io to the Kasten user rancher:<CHANGE_ME> (Rancher user ID with Kasten's
+# "rancher:" prefix) on the Harvester cluster. Fill the user at apply time with sed, or bind it from the Kasten dashboard as user-6hc67
+# (k10-rbac-manager may bind k10-ns-view).
+#
+#   sed "s|rancher:<CHANGE_ME>|rancher:$VIEW_USER|" 05-kasten/rbac/namespace-bindings/k10-ns-view-binding.yaml | kubectl apply -f -
+#   kubectl auth can-i list pods -n kasten-io --as "rancher:$VIEW_USER"      # yes
+#   kubectl auth can-i get secrets -n kasten-io --as "rancher:$VIEW_USER"    # no
+#   kubectl -n kasten-io delete rolebinding k10-ns-view
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: k10-ns-view
+  namespace: kasten-io
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: k10-ns-view
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: "rancher:<CHANGE_ME>"

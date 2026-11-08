@@ -1,0 +1,16 @@
+# oidc-provider: Turns on Rancher's built-in OIDC provider (feature flag oidc-provider, Rancher v2.12+), so applications such as Kasten can
+# log users in with their Rancher identity (local or Entra ID users alike). Issuer: https://rancher.ct.local/oidc. Apply on the Rancher
+# management (local) cluster, i.e. the rancher-vcluster context, not on Harvester. Not a dynamic feature in Rancher v2.14: restart Rancher
+# after changing it (kubectl -n cattle-system rollout restart deploy/rancher). Default on only in Rancher Prime, so community needs this file.
+#
+#   kubectl diff   -f 09-rancher-sso/oidc-provider-feature.yaml
+#   kubectl apply  -f 09-rancher-sso/oidc-provider-feature.yaml
+#   curl --cacert ct-local-root-ca.crt -sS https://rancher.ct.local/oidc/.well-known/openid-configuration
+#   kubectl delete -f 09-rancher-sso/oidc-provider-feature.yaml   # do not delete a built-in Feature; set spec.value: false instead
+
+apiVersion: management.cattle.io/v3
+kind: Feature
+metadata:
+  name: oidc-provider
+spec:
+  value: true

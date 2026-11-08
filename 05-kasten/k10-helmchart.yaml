@@ -1,0 +1,117 @@
+# k10: Installs Veeam Kasten on the Harvester cluster itself (namespace kasten-io, via RKE2 helm-controller), NOT inside Rancher. UI at
+# https://kasten.ct.local/k10 through the Traefik ingress with the cert-manager Secret kasten-io/wildcard-ct-local-tls. Users log in through Rancher's OIDC provider
+# (https://rancher.ct.local/oidc) with client credentials from kasten-io/kasten-oidc-client; Kasten trusts the ct.local CA through ConfigMap
+# kasten-io/custom-ca-bundle-store. Set the admin user (<CHANGE_ME>) before applying; then apply 05-kasten (profiles, policies).
+#
+#   kubectl diff   -f 05-kasten/k10-helmchart.yaml
+#   kubectl apply  -f 05-kasten/k10-helmchart.yaml
+#   curl --cacert ct-local-root-ca.crt -sS -o /dev/null -w '%{http_code}\n' https://kasten.ct.local/k10/
+#   kubectl delete -f 05-kasten/k10-helmchart.yaml
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: k10
+  namespace: kube-system
+spec:
+  repo: https://charts.kasten.io/
+  chart: k10
+  # 9.0.8 (2026-10-19): values in this file were checked against this chart's values.schema.json and templates.
+  # Confirm Kasten's support matrix lists your Harvester release before upgrading.
+  version: "9.0.8"
+  targetNamespace: kasten-io
+  createNamespace: true
+  valuesContent: |-
+    # No eula block: eula.accept defaults to false, so Kasten asks for EULA acceptance in the
+    # dashboard on first login instead of at install time.
+    clusterName: harvester-prod
+
+    # Trust the private ct.local CA (needed to call https://rancher.ct.local/oidc).
+    # ConfigMap key custom-ca-bundle.pem, created by scripts/publish-ct-local-ca.sh.
+    cacertconfigmap:
+      name: custom-ca-bundle-store
+
+    auth:
+      tokenAuth:
+        enabled: false
+      oidcAuth:
+        enabled: true
+        providerURL: https://rancher.ct.local/oidc
+        redirectURL: https://kasten.ct.local      # Kasten appends /k10/auth-svc/v0/oidc/redirect (= OIDCClient redirectURIs)
+        scopes: "openid profile"
+        # Keys client-id, client-secret (scripts/sync-kasten-oidc-secret.sh). Must NOT be named k10-oidc-auth:
+        # the chart creates its own Secret with that name.
+        clientSecretName: kasten-oidc-client
+        usernameClaim: sub
+        usernamePrefix: "rancher:"
+        groupClaim: groups
+        groupPrefix: "rancher:"
+        pkceRequired: true                        # Rancher's OIDC provider only accepts PKCE S256
+      # Gets the k10-admin role. Value = usernamePrefix + the user's "sub" claim as Rancher issues it.
+      k10AdminUsers:
+        - "rancher:<CHANGE_ME>"
+      # k10AdminGroups:                         # once the groups claim format is confirmed, e.g. the Entra group from 09-rancher-sso
+      #   - "rancher:azuread_group://f5644315-9653-43c3-b239-41cab3792871"
+
+    global:
+      persistence:
+        enabled: true
+        storageClass: harvester-longhorn   # exists on every Harvester cluster (lh-capacity needs tagged disks)
+        size: 20Gi
+        catalog:
+          size: 50Gi
+
+    ingress:
+      create: true
+      # Same controller as Harvester's own UI (cattle-system/rancher-expose) and the synced Rancher
+      # ingress: Traefik on the Harvester VIP. kasten.ct.local shares 443 with rancher.ct.local by hostname.
+      # Older Harvester releases use rke2-ingress-nginx instead: check `kubectl get ingress -A`.
+      class: traefik
+      host: kasten.ct.local
+      urlPath: k10
+      tls:
+        enabled: true
+        secretName: wildcard-ct-local-tls
+
+    prometheus:
+      server:
+        enabled: true
+
+    # Hidden from the Kasten dashboard's applications list and from compliance reporting.
+    # This does NOT block backups: a policy that selects these namespaces still backs them up.
+    # The policies in 05-kasten/policies.yaml select namespaces by name, so none of these is selected.
+    excludedApps:
+      # Kubernetes / Harvester / storage system namespaces
+      - kube-system
+      - kube-public
+      - kube-node-lease
+      - default                      # WARNING: Harvester's default VM namespace - VMs created here are hidden from compliance
+      - harvester-system
+      - harvester-public             # shared VM images and templates
+      - longhorn-system
+      - cert-manager
+      - ct-local-tls
+      - trident
+      - portworx
+      # Rancher (embedded in Harvester) namespaces
+      - cattle-system
+      - cattle-capi-system           # Rancher Cluster API (CAPI) controllers
+      - cattle-dashboards            # Rancher monitoring dashboards
+      - cattle-fleet-system
+      - cattle-fleet-clusters-system
+      - cattle-fleet-local-system
+      - cattle-impersonation-system
+      - cattle-local-user-passwords
+      - cattle-logging-system
+      - cattle-monitoring-system
+      - cattle-tokens
+      - cattle-turtles-system
+      - cattle-ui-plugin-system
+      - fleet-default
+      - fleet-local
+      - local
+      # Generated names: new Rancher users / Fleet re-registration create new ones, add them when they appear
+      - cluster-fleet-local-local-1a3d67d0a899
+      - user-hskq6
+      # WARNING: holds Rancher's state (vcluster PVC) and no policy backs it up yet
+      - rancher-vcluster

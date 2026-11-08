@@ -1,0 +1,34 @@
+# k10-ns-view: Read-only counterpart of Kasten's k10-ns-admin Role in namespace kasten-io on the Harvester cluster: same resources, only
+# get/list/watch, and NO secrets (they hold the S3 keys, the OIDC client secret and the DR passphrase). Not Helm-managed, so Kasten
+# upgrades leave it alone. For a read-only dashboard view of Kasten config, pair it with Kasten's built-in k10-config-view ClusterRole.
+# Docs: https://docs.kasten.io/latest/access/rbac/
+#
+#   kubectl diff   -f 05-kasten/rbac/roles/k10-ns-view-role.yaml
+#   kubectl apply  -f 05-kasten/rbac/roles/k10-ns-view-role.yaml
+#   kubectl -n kasten-io get role k10-ns-view -o yaml
+#   kubectl delete -f 05-kasten/rbac/roles/k10-ns-view-role.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: k10-ns-view
+  namespace: kasten-io
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+# secrets intentionally omitted (k10-ns-admin has them); add a rule only with a specific need
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "persistentvolumeclaims", "configmaps", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apik10.kasten.io"]
+    resources: ["k10s"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]

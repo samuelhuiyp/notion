@@ -1,0 +1,39 @@
+# cert-manager: Installs cert-manager v1.18.2 on the Harvester cluster through RKE2's built-in helm-controller (HelmChart in kube-system),
+# into namespace cert-manager with its CRDs. It issues the *.ct.local certificates used by Rancher (rancher-vcluster) and Kasten (kasten-io).
+# Apply with the Harvester kubeconfig. Pin a cert-manager version that supports the Kubernetes version of your Harvester release.
+# Docs: https://cert-manager.io/docs/installation/helm/
+#
+#   kubectl diff   -f 11-cert-manager/cert-manager-helmchart.yaml
+#   kubectl apply  -f 11-cert-manager/cert-manager-helmchart.yaml
+#   kubectl -n cert-manager rollout status deploy/cert-manager-webhook --timeout=180s
+#   kubectl delete -f 11-cert-manager/cert-manager-helmchart.yaml
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  repo: https://charts.jetstack.io
+  chart: cert-manager
+  version: v1.18.2
+  targetNamespace: cert-manager
+  createNamespace: true
+  valuesContent: |-
+    crds:
+      enabled: true
+      keep: true          # uninstalling the chart must not delete every Certificate in the cluster
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+    webhook:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+    cainjector:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi

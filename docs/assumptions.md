@@ -14,8 +14,8 @@ You weren't available to give input, so every value in this repo rests on the as
 | A6 | External storage | NetApp ONTAP (AFF HA pair, 9.10.1+) with one SVM. **NVMe/TCP is the default block protocol (confirmed by you)**, iSCSI kept as fallback, NFSv4.1 for capacity. One generic NFS server | 02-storage-drivers |
 | A7 | SDS | Longhorn (bundled) is the primary storage. Portworx is included because you asked for it, on separate disks | 04-portworx, disk map |
 | A8 | Backup | Kasten runs in the Harvester cluster. S3-compatible object storage with Object Lock exists | 05-kasten |
-| A9 | Rancher | Rancher Prime runs on its own 3-node RKE2 cluster, outside Harvester | 06-rancher |
-| A10 | Identity | An OIDC IdP exists (for Kasten and Rancher SSO) | Kasten / Rancher values |
+| A9 | Rancher | **Changed by you:** Rancher runs inside Harvester as the experimental rancher-vcluster add-on at rancher.ct.local. `06-rancher/rancher-server/` (separate cluster) is kept as the production alternative | 06-rancher |
+| A10 | Identity | Rancher logs users in with Entra ID; Rancher's own OIDC provider logs users into Kasten. TLS is a private ct.local CA from cert-manager | 09-rancher-sso, 11-cert-manager |
 | A11 | Workload mix | About 60% general VMs, 25% databases, 15% guest Kubernetes nodes | overcommit, quotas |
 | A12 | Air-gap | Clusters have internet access (or a proxy) to pull charts and images | Add private registry + `containerd-registry` setting |
 | A13 | Secrets | Nothing secret is committed. Templates are `*.example.yaml` and real copies are git-ignored | — |

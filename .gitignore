@@ -9,3 +9,5 @@ secrets/*.yaml
 kubeconfig*
 # Ansible vault for the ONTAP playbook
 vault.yaml
+# Root CA exported by scripts/publish-ct-local-ca.sh (public cert; distribute via your trust tooling, not Git)
+ct-local-root-ca.crt

@@ -1,0 +1,53 @@
+# k10-rbac-guardrail: Admission policy on the Harvester cluster that limits RBAC changes made by Kasten dashboard users (any username
+# starting with "rancher:", Kasten's OIDC usernamePrefix) to Kasten objects: Roles/ClusterRoles named k10-*, and RoleBindings/
+# ClusterRoleBindings whose roleRef is k10-*. RBAC alone can't restrict update/delete that way, so without this a Kasten manager could
+# delete Harvester's or Rancher's own bindings. Needs Kubernetes 1.30+ (ValidatingAdmissionPolicy v1). Platform admins are unaffected.
+# Docs: https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/
+#
+#   kubectl diff   -f 05-kasten/rbac/policies/k10-rbac-guardrail-vap.yaml
+#   kubectl apply  -f 05-kasten/rbac/policies/k10-rbac-guardrail-vap.yaml
+#   kubectl delete clusterrolebinding cluster-admin --dry-run=server --as "rancher:$ADMIN"   # denied by k10-rbac-guardrail
+#   kubectl delete -f 05-kasten/rbac/policies/k10-rbac-guardrail-vap.yaml
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: k10-rbac-guardrail
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+  matchConditions:
+    # Only identities that come through Kasten's OIDC login (usernamePrefix "rancher:")
+    - name: kasten-dashboard-user
+      expression: "request.userInfo.username.startsWith('rancher:')"
+  variables:
+    # On DELETE the request carries only oldObject
+    - name: obj
+      expression: "request.operation == 'DELETE' ? oldObject : object"
+  validations:
+    - expression: >-
+        !(request.resource.resource in ['roles', 'clusterroles']) ||
+        variables.obj.metadata.name.startsWith('k10-')
+      message: "Kasten dashboard users may only create, change or delete Roles/ClusterRoles named k10-*."
+    - expression: >-
+        !(request.resource.resource in ['rolebindings', 'clusterrolebindings']) ||
+        variables.obj.roleRef.name.startsWith('k10-')
+      message: "Kasten dashboard users may only manage bindings to k10-* roles."
+---
+# Turns the policy on for the whole cluster, in Deny mode
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: k10-rbac-guardrail
+  labels:
+    app.kubernetes.io/part-of: k10-rbac
+spec:
+  policyName: k10-rbac-guardrail
+  validationActions: ["Deny"]
