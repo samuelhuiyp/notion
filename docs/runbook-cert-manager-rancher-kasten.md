@@ -502,9 +502,9 @@ The guardrail only applies if the dashboard makes changes **as the logged-in use
 ### 5.6 Let the test-vm user manage restore point contents
 
 `k10-basic` can delete the namespaced `RestorePoint`, but that leaves the backup data in place. Deleting or expiring the backup acts on the cluster-scoped `RestorePointContent`, which a namespace RoleBinding can't grant. Chosen approach (files from the repo owner):
-- **`05-kasten/rbac/k10-retorecontent-manage-role.yaml`:** ClusterRole `k10-rpc-vm-test`, get/list/watch/create/update/patch on `restorepointcontents` and `restorepointcontents/details`.
-- **`05-kasten/rbac/k10-manage-restorecontent-binding.yaml`:** ClusterRoleBinding `k10-manage-restorecontent` for `rancher:m-66rfb`.
-- **`05-kasten/rbac/k10-basic-test-vm-binding.yaml`:** RoleBinding `k10-basic` in `test-vm` for the same user.
+- **`05-kasten/rbac/roles/k10-retorecontent-manage-role.yaml`:** ClusterRole `k10-rpc-vm-test`, get/list/watch/create/update/patch on `restorepointcontents` and `restorepointcontents/details`.
+- **`05-kasten/rbac/cluster-bindings/k10-manage-restorecontent-binding.yaml`:** ClusterRoleBinding `k10-manage-restorecontent` for `rancher:m-66rfb`.
+- **`05-kasten/rbac/namespace-bindings/k10-basic-test-vm-binding.yaml`:** RoleBinding `k10-basic` in `test-vm` for the same user.
 
 Known limits of this choice:
 - **Not limited to `test-vm`.** The role applies to every namespace's restore point contents, so the user can update or patch backups of any namespace, production included.
@@ -513,9 +513,9 @@ Known limits of this choice:
 
 ```bash
 use-harvester
-kubectl apply -f 05-kasten/rbac/k10-basic-test-vm-binding.yaml
-kubectl apply -f 05-kasten/rbac/k10-retorecontent-manage-role.yaml
-kubectl apply -f 05-kasten/rbac/k10-manage-restorecontent-binding.yaml
+kubectl apply -f 05-kasten/rbac/namespace-bindings/k10-basic-test-vm-binding.yaml
+kubectl apply -f 05-kasten/rbac/roles/k10-retorecontent-manage-role.yaml
+kubectl apply -f 05-kasten/rbac/cluster-bindings/k10-manage-restorecontent-binding.yaml
 ```
 
 **Validate:**
@@ -536,7 +536,7 @@ kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io --as $U       
 ```bash
 use-harvester
 VIEW_USER=<rancher-user-id>
-sed "s|rancher:<CHANGE_ME>|rancher:$VIEW_USER|" 05-kasten/rbac/k10-ns-view-binding.yaml | kubectl apply -f -
+sed "s|rancher:<CHANGE_ME>|rancher:$VIEW_USER|" 05-kasten/rbac/namespace-bindings/k10-ns-view-binding.yaml | kubectl apply -f -
 ```
 
 **Validate:**

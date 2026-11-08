@@ -3,10 +3,10 @@
 # upgrades leave it alone. For a read-only dashboard view of Kasten config, pair it with Kasten's built-in k10-config-view ClusterRole.
 # Docs: https://docs.kasten.io/latest/access/rbac/
 #
-#   kubectl diff   -f 05-kasten/rbac/k10-ns-view-role.yaml
-#   kubectl apply  -f 05-kasten/rbac/k10-ns-view-role.yaml
+#   kubectl diff   -f 05-kasten/rbac/roles/k10-ns-view-role.yaml
+#   kubectl apply  -f 05-kasten/rbac/roles/k10-ns-view-role.yaml
 #   kubectl -n kasten-io get role k10-ns-view -o yaml
-#   kubectl delete -f 05-kasten/rbac/k10-ns-view-role.yaml
+#   kubectl delete -f 05-kasten/rbac/roles/k10-ns-view-role.yaml
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

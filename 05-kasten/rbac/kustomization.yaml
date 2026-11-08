@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 # Apply on Harvester after Kasten (05-kasten/k10-helmchart.yaml).
+# Layout (same convention as 10-rancher-rbac): roles/, cluster-bindings/, namespace-bindings/, policies/.
+# Not listed: namespace-bindings/k10-ns-view-binding.yaml (placeholder user, applied with sed) and the
+# test-vm restore point files (roles/k10-retorecontent-manage-role.yaml + its bindings, runbook 5.6).
 resources:
-  - k10-rbac-guardrail-vap.yaml
-  - k10-rbac-manager-clusterrole.yaml
-  - k10-rbac-manager-binding.yaml
-  - k10-ns-view-role.yaml          # its binding (placeholder user) is applied with sed
+  - policies/k10-rbac-guardrail-vap.yaml
+  - roles/k10-rbac-manager-clusterrole.yaml
+  - cluster-bindings/k10-rbac-manager-binding.yaml
+  - roles/k10-ns-view-role.yaml

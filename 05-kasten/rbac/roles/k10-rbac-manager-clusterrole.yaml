@@ -3,10 +3,10 @@
 # exceed what the user already holds (k10-admin). Limiting changes to k10-* objects is enforced by k10-rbac-guardrail-vap.yaml.
 # Docs: https://docs.kasten.io/latest/access/rbac/
 #
-#   kubectl diff   -f 05-kasten/rbac/k10-rbac-manager-clusterrole.yaml
-#   kubectl apply  -f 05-kasten/rbac/k10-rbac-manager-clusterrole.yaml
+#   kubectl diff   -f 05-kasten/rbac/roles/k10-rbac-manager-clusterrole.yaml
+#   kubectl apply  -f 05-kasten/rbac/roles/k10-rbac-manager-clusterrole.yaml
 #   kubectl auth can-i bind clusterroles/k10-basic --as "rancher:<user-id>"      # yes (once bound)
-#   kubectl delete -f 05-kasten/rbac/k10-rbac-manager-clusterrole.yaml
+#   kubectl delete -f 05-kasten/rbac/roles/k10-rbac-manager-clusterrole.yaml
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

@@ -4,10 +4,10 @@
 # delete Harvester's or Rancher's own bindings. Needs Kubernetes 1.30+ (ValidatingAdmissionPolicy v1). Platform admins are unaffected.
 # Docs: https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/
 #
-#   kubectl diff   -f 05-kasten/rbac/k10-rbac-guardrail-vap.yaml
-#   kubectl apply  -f 05-kasten/rbac/k10-rbac-guardrail-vap.yaml
+#   kubectl diff   -f 05-kasten/rbac/policies/k10-rbac-guardrail-vap.yaml
+#   kubectl apply  -f 05-kasten/rbac/policies/k10-rbac-guardrail-vap.yaml
 #   kubectl delete clusterrolebinding cluster-admin --dry-run=server --as "rancher:$ADMIN"   # denied by k10-rbac-guardrail
-#   kubectl delete -f 05-kasten/rbac/k10-rbac-guardrail-vap.yaml
+#   kubectl delete -f 05-kasten/rbac/policies/k10-rbac-guardrail-vap.yaml
 
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy

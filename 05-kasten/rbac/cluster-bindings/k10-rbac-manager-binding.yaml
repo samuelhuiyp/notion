@@ -3,10 +3,10 @@
 # 05-kasten/k10-helmchart.yaml). Rancher user IDs change if Rancher is reinstalled from scratch: update this binding then.
 # Docs: https://docs.kasten.io/latest/access/rbac/
 #
-#   kubectl diff   -f 05-kasten/rbac/k10-rbac-manager-binding.yaml
-#   kubectl apply  -f 05-kasten/rbac/k10-rbac-manager-binding.yaml
+#   kubectl diff   -f 05-kasten/rbac/cluster-bindings/k10-rbac-manager-binding.yaml
+#   kubectl apply  -f 05-kasten/rbac/cluster-bindings/k10-rbac-manager-binding.yaml
 #   kubectl auth can-i create clusterrolebindings --as rancher:user-6hc67     # yes
-#   kubectl delete -f 05-kasten/rbac/k10-rbac-manager-binding.yaml
+#   kubectl delete -f 05-kasten/rbac/cluster-bindings/k10-rbac-manager-binding.yaml
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
