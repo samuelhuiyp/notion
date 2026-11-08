@@ -47,13 +47,7 @@ Directories are numbered in apply order. Each Kubernetes stage has a `kustomizat
 | 6 | Storage classes | `kubectl apply -k 03-storage-classes` (drop `portworx.yaml` if step 5 skipped), un-default `harvester-longhorn` |
 | 7 | Optimisation | `kubectl apply -k 07-optimisation`, `kubectl patch` addons and KubeVirt per file headers |
 | 8 | Overcommit + quotas | `kubectl apply -k 08-overcommit` |
-| 9 | **cert-manager → Rancher → Kasten: follow `docs/runbook-cert-manager-rancher-kasten.md`** (steps 9a–9f with validation) | |
-| 9a | cert-manager + ct.local CA (Harvester) | `kubectl apply -f 11-cert-manager/cert-manager-helmchart.yaml`, wait for the webhook, then `kubectl apply -f 11-cert-manager/ct-local-ca.yaml` |
-| 9b | Namespaces for the certificates | `kubectl apply -f 06-rancher/vcluster-addon/rancher-addon.yaml` (bootstrap password set) and `kubectl apply -f 05-kasten/k10-helmchart.yaml` (version + admin set) |
-| 9c | *.ct.local certificates + CA publishing | `kubectl apply -f 11-cert-manager/wildcard-ct-local-certificates.yaml`, then `scripts/publish-ct-local-ca.sh`; import `ct-local-root-ca.crt` on workstations |
-| 9d | Rancher OIDC provider (Rancher context) | `kubectl apply -f 09-rancher-sso/oidc-provider-feature.yaml`, then `09-rancher-sso/oidc-client-kasten.yaml` |
-| 9e | Kasten OIDC credentials | `scripts/sync-kasten-oidc-secret.sh`; restart Kasten auth: `kubectl -n kasten-io rollout restart deploy/auth-svc` |
-| 9f | Kasten profiles and policies | secrets from `05-kasten/secrets/*.example.yaml`, then `kubectl apply -k 05-kasten` |
+| 9 | cert-manager → Rancher (vcluster) → Kasten, incl. OIDC and Kasten RBAC | follow `docs/runbook-cert-manager-rancher-kasten.md` (phases 0–5, each step with validation) |
 | 10 | Rancher | Import Harvester (`06-rancher/harvester-import`), then guest clusters |
 | 11 | Validate | `docs/review-notes.md` → *Validation before production* |
 

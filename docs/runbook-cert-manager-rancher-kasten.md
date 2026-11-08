@@ -11,11 +11,11 @@ Every step ends with a **Validate** block. Don't continue until it shows the exp
 | 2 | Harvester | CoreDNS entries so pods can resolve `rancher.ct.local` |
 | 3 | Harvester, then Rancher | Rancher add-on on the new certificate |
 | 4 | Rancher | OIDC provider and Kasten OIDC client |
-| 5 | Rancher, then Harvester | Kasten OIDC secret, Kasten install, first login |
+| 5 | Rancher, then Harvester | Kasten OIDC secret, Kasten install, first login, snapshot class, profiles/policies, Kasten RBAC |
 
-Run everything from the repo root in WSL (`/mnt/c/Users/Samuel/git/notion`) on branch `claude/cert-manager-rancher-oidc-kasten`.
+Run everything from the repo root in WSL (`/mnt/c/Users/Samuel/git/notion`), on `main` once PR #2 is merged (until then on branch `claude/cert-manager-rancher-oidc-kasten`).
 
-**Status:** tested end to end in the ct.local lab in November 2026: Rancher on the ct.local certificate, and Kasten login through Rancher's OIDC provider working.
+**Status:** phases 0–5.3 tested end to end in the ct.local lab in November 2026: Rancher on the ct.local certificate, and Kasten login through Rancher's OIDC provider working. Steps 5.4–5.7 (snapshot class, profiles/policies, Kasten RBAC) were added afterwards; rely on their own **Validate** blocks.
 
 | Component | Version in the test | Where |
 |---|---|---|
@@ -36,7 +36,7 @@ Read **Lessons from the first test run** at the end before starting: it lists th
 ```bash
 sudo dnf install -y jq openssl
 kubectl version --client
-git switch claude/cert-manager-rancher-oidc-kasten && git pull
+git switch main && git pull               # or claude/cert-manager-rancher-oidc-kasten until PR #2 is merged
 git config core.autocrlf input
 sed -i 's/\r$//' scripts/*.sh            # Windows checkouts add CR characters to scripts
 ```
@@ -59,7 +59,7 @@ chmod 600 ~/.kube/harvester.yaml
 
 This is a full cluster-admin credential with no expiry. Keep it in `~/.kube`, never in the repo, and delete it when testing is done. If kubectl later reports `x509: certificate is valid for ..., not <ip>`, use a different management node's IP.
 
-**Rancher kubeconfig.** For now, copy the Rancher kubeconfig you already use (the one behind your earlier `rancher` context) to `~/.kube/rancher.yaml`. Re-download it in step 3.4, because the certificate and CA change in phase 3.
+**Rancher kubeconfig.** If you already have a kubeconfig for Rancher's `local` cluster, copy it to `~/.kube/rancher.yaml` now (step 0.4 needs it). Re-download it in step 3.4, because the certificate and CA change in phase 3. On a first install with no Rancher yet, skip this until 3.4.
 
 ```bash
 cp <your-current-rancher-kubeconfig> ~/.kube/rancher.yaml && chmod 600 ~/.kube/rancher.yaml
@@ -113,9 +113,11 @@ Write down the two IPs. In the tested lab both are `192.168.1.60`, because Ranch
 
 If `rancher-expose` uses `nginx` on a different Harvester, step 5.2 says how to override the class.
 
-### 0.4 Clean up earlier Kasten attempts
+### 0.4 Clean up earlier Kasten attempts (first install only)
 
-Earlier attempts left Kasten in the vcluster and conflicting objects in `kasten-io`. Remove them **before** phase 1, because step 1.3 creates certificates inside `kasten-io`.
+> **Skip this step if Kasten already works on Harvester.** Deleting `kasten-io` removes Kasten, its catalog (the record of all restore points) and the secrets in it.
+
+Use it only for a first install, or after a failed attempt: those left Kasten in the vcluster and conflicting objects in `kasten-io`. Remove them **before** phase 1, because step 1.3 creates certificates inside `kasten-io`.
 
 ```bash
 use-rancher
@@ -128,7 +130,7 @@ kubectl -n kube-system get helmchart k10 && kubectl -n kube-system delete helmch
 kubectl get ns kasten-io && kubectl delete ns kasten-io
 ```
 
-Nothing from those attempts is worth keeping: no Kasten backups exist yet. Each `get` that returns `NotFound` means there's nothing to clean.
+Only run the Harvester part if no Kasten backups exist yet. Each `get` that returns `NotFound` means there's nothing to clean.
 
 **Validate:** in both clusters, `kubectl get ns kasten-io` returns `NotFound` (namespace deletion can take a minute).
 
@@ -357,7 +359,7 @@ Kasten receives the Rancher user ID as the `sub` claim and prefixes it with `ran
 kubectl get users.management.cattle.io -o custom-columns=ID:.metadata.name,NAME:.displayName,USERNAME:.username,PRINCIPALS:.principalIds
 ```
 
-Note the `ID` of the account that should administer Kasten (`u-xxxxx` for Entra ID users, `user-xxxxx` for local ones). Log in to Rancher once with that account first, so the user object exists.
+Note the `ID` of the account that should administer Kasten. The prefix varies by how the user was created (this lab has `user-6hc67` and `m-66rfb`); use the `ID` column exactly. Log in to Rancher once with that account first, so the user object exists.
 
 ---
 
@@ -450,9 +452,9 @@ kubectl get volumesnapshotclass -o custom-columns=NAME:.metadata.name,DRIVER:.dr
 
 If a PVC uses another driver (e.g. NetApp `csi.trident.netapp.io`), apply its class from `03-storage-classes/volume-snapshot-classes.yaml`. Then re-run the backup from the Kasten dashboard; the precheck passes.
 
-Profiles and policies:
-
-After the location-profile secrets exist (from `05-kasten/secrets/*.example.yaml`):
+**Profiles and policies.** `kubectl apply -k 05-kasten` applies the snapshot class above **plus** `location-profiles.yaml` and `policies.yaml`. Those two still hold the baseline's placeholder values: S3 endpoint `https://s3.corp.example.com`, an NFS StorageClass `nfs-capacity`, and policies for `vm-prod`, `vm-dmz`, `rke2-guests` and `vm-dev`. Before applying:
+1. Edit `05-kasten/location-profiles.yaml` (endpoint, bucket, region, and the NFS profile or remove it) and `05-kasten/policies.yaml` (namespaces, schedules) for your environment.
+2. Create the secrets from `05-kasten/secrets/*.example.yaml` (as `*.secret.yaml`, git-ignored).
 
 ```bash
 use-harvester
@@ -460,9 +462,11 @@ kubectl apply -k 05-kasten
 kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kasten.io
 ```
 
+**Validate:** in the dashboard, each profile shows **Valid**, and running a policy once creates restore points (`kubectl get restorepoints.apps.kio.kasten.io -A`).
+
 ### 5.5 Let a Kasten admin manage Kasten RBAC from the dashboard
 
-`k10-admin` has no permissions on Kubernetes RBAC, so the dashboard's roles and bindings pages are read-only or refused for it. The files in `05-kasten/rbac/` add, on Harvester:
+`k10-admin` has no permissions on Kubernetes RBAC, so the dashboard's roles and bindings pages are read-only or refused for it. The files in `05-kasten/rbac/` (grouped in `roles/`, `cluster-bindings/`, `namespace-bindings/`, `policies/`) add, on Harvester:
 - **`k10-rbac-manager` ClusterRole:** view and manage roles and bindings; `bind` only Kasten's built-in roles; no `escalate`.
 - **`k10-rbac-managers` ClusterRoleBinding** for the Kasten user `rancher:user-6hc67` (Rancher local user `user-6hc67`).
 - **`k10-rbac-guardrail` ValidatingAdmissionPolicy:** Kasten dashboard users (`rancher:*`) may only change `k10-*` roles and bindings to `k10-*` roles.
@@ -471,7 +475,7 @@ kubectl -n kasten-io get profiles.config.kio.kasten.io,policies.config.kio.kaste
 use-harvester
 kubectl api-resources | grep -c validatingadmissionpolicies     # >= 1 (Kubernetes 1.30+)
 ADMIN=user-6hc67                                 # used by the checks below
-kubectl apply -k 05-kasten/rbac                  # policy, ClusterRole and binding
+kubectl apply -k 05-kasten/rbac                  # all Kasten RBAC: this step, 5.6 and the k10-ns-view role of 5.7
 ```
 
 **Validate (RBAC):**
@@ -502,13 +506,12 @@ The guardrail only applies if the dashboard makes changes **as the logged-in use
 ### 5.6 Let the test-vm user manage restore point contents
 
 `k10-basic` can delete the namespaced `RestorePoint`, but that leaves the backup data in place. Deleting or expiring the backup acts on the cluster-scoped `RestorePointContent`, which a namespace RoleBinding can't grant. Chosen approach (files from the repo owner):
-- **`05-kasten/rbac/roles/k10-retorecontent-manage-role.yaml`:** ClusterRole `k10-rpc-vm-test`, get/list/watch/create/update/patch on `restorepointcontents` and `restorepointcontents/details`.
+- **`05-kasten/rbac/roles/k10-retorecontent-manage-role.yaml`:** ClusterRole `k10-rpc-vm-test`, get/list/watch/create/update/patch/delete on `restorepointcontents` and `restorepointcontents/details`.
 - **`05-kasten/rbac/cluster-bindings/k10-manage-restorecontent-binding.yaml`:** ClusterRoleBinding `k10-manage-restorecontent` for `rancher:m-66rfb`.
 - **`05-kasten/rbac/namespace-bindings/k10-basic-test-vm-binding.yaml`:** RoleBinding `k10-basic` in `test-vm` for the same user.
 
 Known limits of this choice:
-- **Not limited to `test-vm`.** The role applies to every namespace's restore point contents, so the user can update or patch backups of any namespace, production included.
-- **No `delete` verb.** Deleting a backup through its RestorePointContent is still refused. Add `delete` only if that's intended, and remember it would also apply to every namespace.
+- **Not limited to `test-vm`.** The role applies to every namespace's restore point contents. The user can update, expire **and delete backups of any namespace, production included**. Deleting a RestorePointContent is permanent and overrides retention (Kasten API docs).
 - **`create` has no effect.** Kasten's API docs say a RestorePointContent "cannot be created directly".
 
 ```bash
@@ -522,10 +525,10 @@ U=rancher:m-66rfb
 kubectl auth can-i create backupactions.actions.kio.kasten.io -n test-vm --as $U          # yes (k10-basic)
 kubectl auth can-i delete restorepoints.apps.kio.kasten.io -n test-vm --as $U             # yes (k10-basic)
 kubectl auth can-i patch  restorepointcontents.apps.kio.kasten.io --as $U                 # yes (all namespaces)
-kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io --as $U                 # no (no delete verb)
+kubectl auth can-i delete restorepointcontents.apps.kio.kasten.io --as $U                 # yes (all namespaces)
 ```
 
-**Validate (dashboard):** log in as `m-66rfb` and try **set expiry** and **delete** on a `test-vm` restore point. If delete is refused, the error names the missing verb.
+**Validate (dashboard):** log in as `m-66rfb` and try **set expiry** and **delete** on a **test** restore point in `test-vm`; both should succeed. Don't test on other namespaces: deletion there would succeed too, and it's permanent.
 
 ### 5.7 Read-only role for the Kasten namespace
 
@@ -578,8 +581,8 @@ These cost the most time in the first run. Each is now built into the steps abov
 | `addons.k3s.cattle.io "rancher-vcluster" not found` | kubectl's short name `addon` picked RKE2's resource | use `addons.harvesterhci.io` |
 | Pods in `rancher-vcluster` all hours old after step 3.1 | expected if the same values were already applied; otherwise the change didn't roll out | values grep = 3 and step 3.2 passes → fine; grep < 3 → re-apply 3.1 |
 | Helm job: `exists and cannot be imported into the current release` | leftovers from an earlier attempt | step 0.4, then re-run 1.3 and onwards |
-| Backup: `Failed to find VolumeSnapshotClass with annotation in the cluster` | no Kasten-annotated VolumeSnapshotClass for the PVC's CSI driver | step 5.4: `05-kasten/k10-volumesnapshotclass-longhorn.yaml` |
 | Same error naming `Secret "k10-oidc-auth"` | client secret given the chart's reserved name | delete it; recreate as `kasten-oidc-client` (step 5.1) |
+| Backup: `Failed to find VolumeSnapshotClass with annotation in the cluster` | no Kasten-annotated VolumeSnapshotClass for the PVC's CSI driver | step 5.4: `05-kasten/k10-volumesnapshotclass-longhorn.yaml` |
 | Kasten pods running but `cannot resolve rancher.ct.local`, and `whereami` → RANCHER | Kasten installed inside the vcluster | step 0.4 (remove it there), then 5.2 with `use-harvester` |
 | `env: 'bash\r': No such file or directory` | CRLF line endings from a Windows checkout | `sed -i 's/\r$//' scripts/*.sh` |
 | `jq: command not found` | jq missing in WSL Fedora | `sudo dnf install -y jq` |
