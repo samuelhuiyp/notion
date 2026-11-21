@@ -1,0 +1,88 @@
+# raw-image-base-version-v2: New version of the Harvester VM template raw-image-base-template (namespace harvester-public), based on raw-image-base-version.
+# Changes: CPU/memory hotplug (1 vCPU / 2Gi now, up to 4 vCPU / 8Gi live), reservedMemory 0Mi (annotation was not set), and a custom 4096/4096 logical/physical
+# block size on rootdisk. Sizes, disks, firmware and everything else are unchanged. Apply on the Harvester cluster; the controller adds the ownerReference.
+#
+#   kubectl diff   -f raw-image-base-version-v2.yaml
+#   kubectl apply  -f raw-image-base-version-v2.yaml
+#   kubectl get virtualmachinetemplateversion raw-image-base-version-v2 -n harvester-public -o yaml
+#   kubectl delete -f raw-image-base-version-v2.yaml
+
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplateVersion
+metadata:
+  annotations:
+    harvesterhci.io/default-userdata-secret: raw-image-template-userdata
+  name: raw-image-base-version-v2
+  namespace: harvester-public
+  labels:
+    template.harvesterhci.io/templateID: raw-image-base-template
+spec:
+  templateId: harvester-public/raw-image-base-template
+  vm:
+    metadata:
+      annotations:
+        harvesterhci.io/reservedMemory: 0Mi
+        harvesterhci.io/volumeClaimTemplates: |-
+          [{
+            "metadata": {
+              "name": "pvc-rootdisk",
+              "annotations": {
+                "harvesterhci.io/imageId": ""
+              }
+            },
+            "spec":{
+              "accessModes": ["ReadWriteMany"],
+              "resources":{
+                "requests":{
+                  "storage": "10Gi"
+                }
+              },
+              "volumeMode": "Block"
+            }
+          }]
+    spec:
+      runStrategy: RerunOnFailure
+      template:
+        metadata: {}
+        spec:
+          domain:
+            cpu:
+              cores: 1
+              sockets: 1
+              maxSockets: 4
+            memory:
+              guest: 2Gi
+              maxGuest: 8Gi
+            devices:
+              disks:
+                - bootOrder: 1
+                  disk:
+                    bus: virtio
+                  name: rootdisk
+                  blockSize:
+                    custom:
+                      logical: 4096
+                      physical: 4096
+              interfaces:
+                - masquerade: {}
+                  model: virtio
+                  name: default
+            features:
+              acpi:
+                enabled: true
+            resources:
+              limits:
+                cpu: '1'
+                memory: 2Gi
+          evictionStrategy: LiveMigrateIfPossible
+          networks:
+            - name: default
+              pod: {}
+          volumes:
+            - name: rootdisk
+              persistentVolumeClaim:
+                claimName: pvc-rootdisk
+            - cloudInitNoCloud:
+                secretRef:
+                  name: raw-image-template-userdata
+              name: cloudinitdisk

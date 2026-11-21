@@ -1,0 +1,81 @@
+# harvester-template-default-versions-v2: Points the 8 Windows/Linux VM templates in namespace harvester-public at their new v2 template versions
+# (spec.defaultVersionId). Only that field is set; descriptions and the version objects themselves are not touched. Apply on the Harvester cluster
+# after all eight v2 VirtualMachineTemplateVersion files exist. Do NOT use "kubectl delete -f" on this file: it would delete the templates.
+# Roll back by changing defaultVersionId back to the previous version name (see the comment above each document).
+#
+#   kubectl get virtualmachinetemplate -n harvester-public -o custom-columns=NAME:.metadata.name,DEFAULT:.spec.defaultVersionId
+#   kubectl diff   -f harvester-template-default-versions-v2.yaml
+#   kubectl apply  -f harvester-template-default-versions-v2.yaml
+#   kubectl get virtualmachinetemplate -n harvester-public -o custom-columns=NAME:.metadata.name,DEFAULT:.spec.defaultVersionId
+
+# windows-iso-small-template: previous default windows-iso-small-optimized
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: windows-iso-small-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/windows-iso-small-optimized-v2
+---
+# windows-iso-medium-template: previous default windows-iso-medium-optimized
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: windows-iso-medium-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/windows-iso-medium-optimized-v2
+---
+# windows-iso-large-template: previous default windows-iso-large-optimized
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: windows-iso-large-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/windows-iso-large-optimized-v2
+---
+# windows-w11-iso-template: previous default windows-w11-iso-optimized
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: windows-w11-iso-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/windows-w11-iso-optimized-v2
+---
+# iso-image-base-template: previous default iso-image-base-version
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: iso-image-base-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/iso-image-base-version-v2
+---
+# raw-image-base-template: previous default raw-image-base-version
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: raw-image-base-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/raw-image-base-version-v2
+---
+# windows-iso-image-base-template: previous default windows-iso-image-base-version
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: windows-iso-image-base-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/windows-iso-image-base-version-v2
+---
+# windows-raw-image-base-template: previous default windows-raw-image-base-version
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplate
+metadata:
+  name: windows-raw-image-base-template
+  namespace: harvester-public
+spec:
+  defaultVersionId: harvester-public/windows-raw-image-base-version-v2

@@ -1,0 +1,158 @@
+# windows-iso-medium-optimized-v2: New version of the Harvester VM template windows-iso-medium-template (namespace harvester-public), based on
+# windows-iso-medium-optimized. Changes: EFI boot (persistent state, secure boot off), CPU/memory hotplug (4 vCPU / 16Gi now, up to 16 vCPU /
+# 64Gi live), 128Gi rootdisk (was 64Gi) with custom 4096/4096 block size, and reservedMemory 0Mi (was 256Mi). CPU/memory sizes unchanged.
+# Apply on the Harvester cluster; the template controller adds the ownerReference. Make it the default version in the UI if wanted.
+# Hyper-V enlightenments and clock use the standard set; synictimer is enabled without direct mode.
+#
+#   kubectl diff   -f windows-iso-medium-optimized-v2.yaml
+#   kubectl apply  -f windows-iso-medium-optimized-v2.yaml
+#   kubectl get virtualmachinetemplateversion windows-iso-medium-optimized-v2 -n harvester-public -o yaml
+#   kubectl delete -f windows-iso-medium-optimized-v2.yaml
+
+apiVersion: harvesterhci.io/v1beta1
+kind: VirtualMachineTemplateVersion
+metadata:
+  name: windows-iso-medium-optimized-v2
+  namespace: harvester-public
+  labels:
+    template.harvesterhci.io/templateID: windows-iso-medium-template
+spec:
+  templateId: harvester-public/windows-iso-medium-template
+  vm:
+    metadata:
+      annotations:
+        harvesterhci.io/reservedMemory: 0Mi
+        harvesterhci.io/volumeClaimTemplates: |-
+          [{
+            "metadata": {
+              "name": "pvc-cdrom-disk",
+              "annotations": {
+                "harvesterhci.io/imageId": ""
+              }
+            },
+            "spec":{
+              "accessModes": ["ReadWriteMany"],
+              "resources":{
+                "requests":{
+                  "storage": "20Gi"
+                }
+              },
+              "volumeMode": "Block"
+            }
+          },
+          {
+            "metadata": {
+              "name": "pvc-rootdisk"
+            },
+            "spec":{
+              "accessModes": ["ReadWriteMany"],
+              "resources":{
+                "requests":{
+                  "storage": "128Gi"
+                }
+              },
+              "volumeMode": "Block"
+            }
+          }]
+      labels:
+        harvesterhci.io/os: windows
+    spec:
+      runStrategy: RerunOnFailure
+      template:
+        metadata: {}
+        spec:
+          domain:
+            clock:
+              timer:
+                hpet:
+                  present: false
+                hyperv:
+                  present: true
+                pit:
+                  tickPolicy: delay
+                rtc:
+                  tickPolicy: catchup
+              utc: {}
+            cpu:
+              cores: 4
+              sockets: 1
+              maxSockets: 4
+            memory:
+              guest: 16Gi
+              maxGuest: 64Gi
+            firmware:
+              bootloader:
+                efi:
+                  persistent: true
+                  secureBoot: false
+            devices:
+              disks:
+                - bootOrder: 1
+                  cdrom:
+                    bus: sata
+                  name: cdrom-disk
+                - bootOrder: 2
+                  disk:
+                    bus: virtio
+                  name: rootdisk
+                  blockSize:
+                    custom:
+                      logical: 4096
+                      physical: 4096
+                - cdrom:
+                    bus: sata
+                  name: virtio-container-disk
+              inputs:
+                - bus: usb
+                  name: tablet
+                  type: tablet
+              interfaces:
+                - masquerade: {}
+                  model: e1000
+                  name: default
+            features:
+              acpi:
+                enabled: true
+              apic:
+                enabled: true
+              hyperv:
+                ipi:
+                  enabled: true
+                relaxed:
+                  enabled: true
+                reset:
+                  enabled: true
+                runtime:
+                  enabled: true
+                spinlocks:
+                  enabled: true
+                  spinlocks: 8191
+                synic:
+                  enabled: true
+                synictimer:
+                  enabled: true
+                vapic:
+                  enabled: true
+                vpindex:
+                  enabled: true
+              smm:
+                enabled: true
+            resources:
+              limits:
+                cpu: '4'
+                memory: 16Gi
+          evictionStrategy: LiveMigrateIfPossible
+          networks:
+            - name: default
+              pod: {}
+          volumes:
+            - name: cdrom-disk
+              persistentVolumeClaim:
+                claimName: pvc-cdrom-disk
+            - name: rootdisk
+              persistentVolumeClaim:
+                claimName: pvc-rootdisk
+            - containerDisk:
+                image: registry.suse.com/suse/vmdp/vmdp:2.5.5
+                imagePullPolicy: IfNotPresent
+              name: virtio-container-disk
