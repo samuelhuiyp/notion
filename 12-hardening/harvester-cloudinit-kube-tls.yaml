@@ -1,0 +1,46 @@
+# kube-tls-hardening: Harvester CloudInit resource that writes /oem/91-kube-tls-hardening.yaml on every control-plane node of the
+# Harvester cluster. At boot that file recreates the RKE2 drop-in /etc/rancher/rke2/config.yaml.d/93-harvester-kube-tls.yaml
+# (0600 root:root): min TLS 1.2 for kube-apiserver, and min TLS 1.2 plus six ECDHE AEAD suites for kube-controller-manager and
+# kube-scheduler. Apply it to the HARVESTER cluster context (cluster-scoped). Nothing changes until each node is rebooted.
+# DRAFT: the matchSelector label and the "+" append syntax are unverified on your build; check the label before applying.
+# Docs: https://documentation.suse.com/en-us/cloudnative/virtualization/v1.5/en/installation-setup/config/cloudinitcrd.html
+#
+#   kubectl --context <harvester> get nodes -l node-role.kubernetes.io/control-plane=true     # must list ONLY mgmt nodes
+#   kubectl --context <harvester> diff   -f harvester-cloudinit-kube-tls.yaml
+#   kubectl --context <harvester> apply  -f harvester-cloudinit-kube-tls.yaml
+#   kubectl --context <harvester> get cloudinit kube-tls-hardening -o yaml      # status: Present per node (before any reboot)
+#   kubectl --context <harvester> delete -f harvester-cloudinit-kube-tls.yaml   # roll back, then reboot each node
+
+apiVersion: node.harvesterhci.io/v1beta1
+kind: CloudInit
+metadata:
+  name: kube-tls-hardening
+spec:
+  # Management (control-plane) nodes only. Verify this label with the first command above; do NOT use
+  # harvesterhci.io/managed: "true" (that selects every node, including workers, which do not run these components).
+  matchSelector:
+    node-role.kubernetes.io/control-plane: "true"
+  filename: 91-kube-tls-hardening
+  paused: false
+  contents: |
+    name: "Kube control-plane TLS hardening (min TLS 1.2, approved ciphers)"
+    stages:
+      initramfs:
+        - name: "Write RKE2 TLS drop-in"
+          files:
+            - path: /etc/rancher/rke2/config.yaml.d/93-harvester-kube-tls.yaml
+              # 384 decimal == 0600 octal (same notation as the Harvester docs example)
+              permissions: 384
+              owner: 0
+              group: 0
+              content: |
+                # Managed by the CloudInit resource kube-tls-hardening - do not edit here (lost at reboot).
+                # "+" appends to values set by earlier drop-ins instead of replacing them.
+                kube-apiserver-arg+:
+                  - "tls-min-version=VersionTLS12"
+                kube-controller-manager-arg+:
+                  - "tls-min-version=VersionTLS12"
+                  - "tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+                kube-scheduler-arg+:
+                  - "tls-min-version=VersionTLS12"
+                  - "tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
